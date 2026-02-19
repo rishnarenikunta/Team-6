@@ -14,7 +14,7 @@ import requests
 
 # WARNING: do NOT commit your real key to GitHub.
 # For local testing this is okay, but you should move this to an env var later.
-GEMINI_API_KEY = "AIzaSyAtmkNs4mpas51ED1_7wPfRBqTsJGtODL4"
+GEMINI_API_KEY = "GEMINIKeyHere"  # replace with your actual Gemini API key
 client = genai.Client(api_key=GEMINI_API_KEY)
 
 GENERATION_MODEL = "gemini-2.0-flash"
