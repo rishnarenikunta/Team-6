@@ -16,7 +16,6 @@ def home():
     }
 
 # -------- CLEANING FUNCTION -------- #
-
 def clean_vtt_text(raw: str) -> str:
     """
     Cleans WebVTT subtitle content by:
