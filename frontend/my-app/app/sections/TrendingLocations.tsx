@@ -51,7 +51,7 @@ export default function TrendingLocations() {
               strokeWidth={3}
               dot={{ r: 4 }}
               activeDot={{
-                r: 8,
+                r: 8, 
                 onMouseEnter: () => setActiveCountry("Japan"),
               }}
             />
