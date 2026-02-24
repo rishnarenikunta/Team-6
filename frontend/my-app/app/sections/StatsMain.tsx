@@ -2,7 +2,7 @@ import StatCard from "../components/StatCard";
 
 export default function StatsMain() {
   return (
-    <div className="min-h-screen bg-black text-white p-8">
+    <div className="text-white p-8">
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
