@@ -5,8 +5,45 @@ import tempfile
 from fastapi import FastAPI, HTTPException
 import yt_dlp
 from datetime import datetime
+from dotenv import load_dotenv
+from pymongo import MongoClient
+import json
+from google.cloud import storage
+import subprocess
+from pydantic import BaseModel
+from openai import OpenAI
 
 app = FastAPI()
+
+BUCKET_NAME = "youtravel_transcripts"
+storage_client = storage.Client()
+
+def upload_transcript_to_gcs(video_id: str, transcript_text: str) -> str:
+    bucket = storage_client.bucket(BUCKET_NAME)
+
+    blob_path = f"transcripts/{video_id}.json"
+    blob = bucket.blob(blob_path)
+
+    payload = {
+        "video_id": video_id,
+        "text": transcript_text,
+    }
+
+    blob.upload_from_string(
+        json.dumps(payload, ensure_ascii=False),
+        content_type="application/json",
+    )
+
+    return f"gs://{BUCKET_NAME}/{blob_path}"
+
+load_dotenv()
+
+MONGODB_URI = os.getenv("MONGODB_URI")
+MONGODB_DB = os.getenv("MONGODB_DB", "travel_app")
+MONGODB_COLLECTION = os.getenv("MONGODB_COLLECTION", "videos")
+
+mongo_client = MongoClient(MONGODB_URI) if MONGODB_URI else None
+videos_col = mongo_client[MONGODB_DB][MONGODB_COLLECTION] if mongo_client else None
 
 @app.get("/")
 def home():
@@ -15,16 +52,7 @@ def home():
         "message": "Go to /docs to test the transcript tool"
     }
 
-# -------- CLEANING FUNCTION -------- #
 def clean_vtt_text(raw: str) -> str:
-    """
-    Cleans WebVTT subtitle content by:
-    - Removing timestamps
-    - Removing HTML/cue tags
-    - Removing metadata
-    - Removing duplicate lines
-    - Removing common caption noise
-    """
 
     raw = html.unescape(raw)
     lines = raw.splitlines()
@@ -38,7 +66,6 @@ def clean_vtt_text(raw: str) -> str:
         if not line:
             continue
 
-        # Skip metadata/header lines
         if (
             line.startswith("WEBVTT")
             or line.startswith("Kind:")
@@ -47,35 +74,25 @@ def clean_vtt_text(raw: str) -> str:
         ):
             continue
 
-        # Remove inline timestamps like <00:01:40.720>
         line = re.sub(r"<\d{2}:\d{2}:\d{2}\.\d{3}>", "", line)
 
-        # Remove cue tags like <c>text</c> and any HTML-like tags
         line = re.sub(r"</?c[^>]*>", "", line)
         line = re.sub(r"</?[^>]+>", "", line)
 
-        # Optional: remove caption noise
         if line.lower() in {"[music]", "[applause]", "[laughter]"}:
             continue
 
-        # Normalize whitespace
         line = re.sub(r"\s+", " ", line).strip()
 
-        # Remove repeated lines (common in auto captions)
         if line in recent_lines:
             continue
 
         cleaned_lines.append(line)
         recent_lines.add(line)
 
-        # Keep dedupe memory small
-        if len(recent_lines) > 50:
-            recent_lines.pop()
 
     return " ".join(cleaned_lines).strip()
 
-
-# -------- TRANSCRIPT ENDPOINT -------- #
 
 @app.get("/transcript/{video_id}")
 def get_transcript(video_id: str):
@@ -84,63 +101,59 @@ def get_transcript(video_id: str):
 
     with tempfile.TemporaryDirectory() as tmpdir:
 
-        ydl_opts = {
-            "skip_download": True,
-            "writesubtitles": True,
-            "writeautomaticsub": True,
-            "subtitleslangs": ["en"],
-            "subtitlesformat": "vtt",
-            "outtmpl": os.path.join(tmpdir, "%(id)s.%(ext)s"),
-            "quiet": True,
-        }
-
-        try:
+        def run_ytdlp(write_manual: bool, write_auto: bool):
+            ydl_opts = {
+                "skip_download": True,
+                "writesubtitles": write_manual,
+                "writeautomaticsub": write_auto,
+                "subtitleslangs": ["en"],
+                "subtitlesformat": "vtt",
+                "outtmpl": os.path.join(tmpdir, "%(id)s.%(ext)s"),
+                "quiet": True,
+            }
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 ydl.download([video_url])
+
+        try:
+            # Prefer manual captions
+            run_ytdlp(write_manual=True, write_auto=False)
+
+            vtt_files = [os.path.join(tmpdir, f) for f in os.listdir(tmpdir) if f.endswith(".vtt")]
+
+            # Fallback to auto captions
+            if not vtt_files:
+                run_ytdlp(write_manual=False, write_auto=True)
+                vtt_files = [os.path.join(tmpdir, f) for f in os.listdir(tmpdir) if f.endswith(".vtt")]
+
         except Exception as e:
-            raise HTTPException(
-                status_code=500,
-                detail=f"yt-dlp error: {str(e)}"
-            )
+            raise HTTPException(status_code=500, detail=f"yt-dlp error: {str(e)}")
 
-        # Find the downloaded .vtt file
-        vtt_file = None
-        for file in os.listdir(tmpdir):
-            if file.endswith(".vtt"):
-                vtt_file = os.path.join(tmpdir, file)
-                break
+        if not vtt_files:
+            raise HTTPException(status_code=404, detail="No subtitles found for this video")
 
-        if not vtt_file:
-            raise HTTPException(
-                status_code=404,
-                detail="No subtitles found for this video"
-            )
+        vtt_file = max(vtt_files, key=lambda p: os.path.getsize(p))
 
         try:
             with open(vtt_file, "r", encoding="utf-8") as f:
                 raw_vtt = f.read()
 
             cleaned_text = clean_vtt_text(raw_vtt)
-
             if not cleaned_text:
-                raise HTTPException(
-                    status_code=404,
-                    detail="Subtitle file found but no readable text extracted"
-                )
+                raise HTTPException(status_code=404, detail="Subtitle file found but no readable text extracted")
+
+            gcs_path = upload_transcript_to_gcs(video_id, cleaned_text)
 
             return {
                 "video_id": video_id,
+                "gcs_path": gcs_path,
                 "text": cleaned_text
             }
 
         except Exception as e:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Parsing error: {str(e)}"
-            )
+            raise HTTPException(status_code=500, detail=f"Parsing error: {str(e)}")
         
 def to_iso_date(upload_date: str | None) -> str | None:
-    # yt-dlp often returns upload_date like "20240211"
+
     if not upload_date:
         return None
     try:
@@ -163,7 +176,6 @@ def get_metadata(video_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"yt-dlp metadata error: {str(e)}")
 
-    # Build a “safe + useful” response schema
     return {
         "video_id": info.get("id"),
         "title": info.get("title"),
@@ -186,3 +198,62 @@ def get_metadata(video_id: str):
         "categories": info.get("categories") or [],
         "language": info.get("language"),
     }
+
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+class YouTubeRequest(BaseModel):
+    video_id: str
+    model: str = "gpt-4o-mini-transcribe"
+
+@app.post("/transcribe/youtube")
+def transcribe_youtube(req: YouTubeRequest):
+    if not client.api_key:
+        raise HTTPException(status_code=500, detail="OPENAI_API_KEY is not set")
+
+    video_url = f"https://www.youtube.com/watch?v={req.video_id}"
+
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            outtmpl = os.path.join(tmpdir, "audio.%(ext)s")
+
+            # 1) Download audio stream only (NO conversion, NO ffmpeg)
+            cmd = [
+                "python", "-m", "yt_dlp",
+                "-f", "bestaudio[ext=m4a]/bestaudio",
+                "-o", outtmpl,
+                video_url,
+            ]
+
+            proc = subprocess.run(cmd, capture_output=True, text=True)
+
+            if proc.returncode != 0:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"yt-dlp failed: {proc.stderr.strip() or proc.stdout.strip()}",
+                )
+
+            # 2) Locate downloaded audio file
+            audio_file = next(
+                f for f in os.listdir(tmpdir) if f.startswith("audio.")
+            )
+            audio_path = os.path.join(tmpdir, audio_file)
+
+            # 3) Read audio bytes
+            with open(audio_path, "rb") as f:
+                audio_bytes = f.read()
+
+            # 4) Transcribe with OpenAI / Whisper
+            result = client.audio.transcriptions.create(
+                model=req.model,
+                file=(audio_file, audio_bytes),
+            )
+
+            return {
+                "video_id": req.video_id,
+                "text": result.text,
+            }
+
+    except StopIteration:
+        raise HTTPException(status_code=400, detail="Audio file not found after download")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
