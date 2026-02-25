@@ -34,6 +34,13 @@ const claims = [
     engagement: "7.5%",
     growth: "+18%",
   },
+  {
+    text: "Hidden ramen spots beat tourist spots.",
+    source: "WanderNina",
+    views: "540K",
+    engagement: "7.5%",
+    growth: "+18%",
+  }
 ];
 
 export default function ClaimsCarousel() {
