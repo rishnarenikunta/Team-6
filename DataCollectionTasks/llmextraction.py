@@ -1,7 +1,7 @@
 # main.py
 
 import os
-from typing import List
+from typing import List, Dict, Any
 
 from google import genai  # pip install google-genai
 
@@ -14,10 +14,17 @@ import requests
 
 # WARNING: do NOT commit your real key to GitHub.
 # For local testing this is okay, but you should move this to an env var later.
-GEMINI_API_KEY = "GEMINIKeyHere"  # replace with your actual Gemini API key
-client = genai.Client(api_key=GEMINI_API_KEY)
+GEMINI_API_KEY = "AIzaSyBvsv5PLBlwVxyGvB6uMaqjv92aTSpfpMw"  # replace with your actual Gemini API key
+#GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+client = genai.Client(
+    api_key=GEMINI_API_KEY,
+    http_options={"api_version": "v1beta"},
+)
 
-GENERATION_MODEL = "gemini-2.0-flash"
+for m in client.models.list():
+    print(m.name)
+
+GENERATION_MODEL = "gemini-2.5-flash"
 TRANSCRIPT_BASE_URL = "http://localhost:8000"  # adjust if different host/port
 
 
@@ -43,23 +50,53 @@ def build_country_features(
     top_comments: List[str],
     transcript: str,
 ) -> str:
+    """
+    Builds a text block with basic video context + transcript.
+    We now use this as part of a richer feature-extraction prompt.
+    """
     text = f"Video title: {title}\n\n"
     text += f"Description:\n{description}\n\n"
     text += "Top comments:\n"
     for i, c in enumerate(top_comments, start=1):
         text += f"{i}. {c}\n"
     text += "\nTranscript:\n"
-    text += transcript
+    # Truncate to avoid sending huge transcripts
+    text += transcript[0:5000]
     return text
 
 
-def extract_countries_for_video(
+# JSON schema for structured video feature extraction
+VIDEO_FEATURES_SCHEMA: Dict[str, Any] = {
+    "type": "OBJECT",
+    "properties": {
+        "countries": {
+            "type": "ARRAY",
+            "items": {"type": "STRING"},
+            "description": "Countries mentioned or clearly implied in the transcript or metadata.",
+        },
+        "places": {
+            "type": "ARRAY",
+            "items": {"type": "STRING"},
+            "description": "Cities, regions, landmarks, or specific locations mentioned.",
+        },
+        "traits": {
+            "type": "ARRAY",
+            "items": {"type": "STRING"},
+            "description": "Other inferred traits, such as topic, tone, target audience, etc.",
+        },
+    },
+    "required": ["countries", "places", "traits"],
+}
+
+
+def extract_video_features_for_video(
     video_id: str,
     title: str,
     description: str,
     top_comments: List[str],
-) -> List[str]:
+) -> Dict[str, List[str]]:
     transcript = fetch_transcript_from_api(video_id)
+    print(transcript[0:5000])
 
     features_text = build_country_features(
         title=title,
@@ -69,32 +106,54 @@ def extract_countries_for_video(
     )
 
     prompt = (
-        "You are an assistant that identifies countries mentioned or implied "
-        "in YouTube videos.\n"
-        "Return ONLY a valid JSON array of country names, e.g. "
-        "[\"France\", \"United States\"].\n"
-        "Only include real countries (no cities or regions).\n"
-        "If no country is clear, return [].\n\n"
-        f"{features_text}\n\n"
-        "Return ONLY the JSON array."
+        "You are extracting structured metadata from a YouTube video.\n\n"
+        "From the following information (title, description, comments, transcript), "
+        "identify the following fields:\n"
+        "- countries: list all countries explicitly mentioned or clearly implied.\n"
+        "- places: list cities, regions, landmarks, or other specific locations mentioned.\n"
+        "- traits: other relevant traits you can infer, such as topic/domain "
+        "(e.g., finance, gaming, education), tone (e.g., casual, formal, salesy), "
+        "target audience (e.g., beginners, advanced), etc.\n\n"
+        "If a field has no good candidates, return an empty array for that field.\n"
+        "Do not include explanations; just follow the schema.\n\n"
+        f"{features_text}\n"
     )
 
     response = client.models.generate_content(
         model=GENERATION_MODEL,
         contents=prompt,
+        config={
+            "response_mime_type": "application/json",
+            "response_schema": VIDEO_FEATURES_SCHEMA,
+        },
     )
-    
 
-    raw = response.text.strip()
-    # print("RAW COUNTRY OUTPUT:", raw)  # uncomment for debugging
+    raw = (response.text or "").strip()
+
+    default_result: Dict[str, List[str]] = {
+        "countries": [],
+        "places": [],
+        "traits": [],
+    }
+    if not raw:
+        return default_result
 
     try:
         data = json.loads(raw)
-        if isinstance(data, list):
-            return [str(c).strip() for c in data if c]
+        if not isinstance(data, dict):
+            return default_result
+
+        countries = data.get("countries") or []
+        places = data.get("places") or []
+        traits = data.get("traits") or []
+
+        return {
+            "countries": [str(c).strip() for c in countries if c],
+            "places": [str(p).strip() for p in places if p],
+            "traits": [str(t).strip() for t in traits if t],
+        }
     except json.JSONDecodeError:
-        return []
-    return []
+        return default_result
 
 
 def build_travel_prompt(
@@ -119,7 +178,7 @@ def build_travel_prompt(
     for i, c in enumerate(top_comments, start=1):
         prompt += f"{i}. {c}\n"
     prompt += "\nTranscript:\n"
-    prompt += transcript
+    prompt += transcript[0:5000]
     return prompt
 
 
@@ -147,11 +206,11 @@ def classify_is_travel_video(
     )
 
     response = client.models.generate_content(
-    model=GENERATION_MODEL,
-    contents=prompt,
-)
+        model=GENERATION_MODEL,
+        contents=prompt,
+    )
 
-    raw = response.text.strip().lower()
+    raw = (response.text or "").strip().lower()
     # print("RAW TRAVEL OUTPUT:", raw)  # uncomment for debugging
 
     # Very simple heuristic based on the expected "Travel" / "Non-Travel" answer
@@ -166,7 +225,6 @@ def classify_is_travel_video(
 if __name__ == "__main__":
     # 1. Choose a video ID that your FastAPI transcript API supports
     test_video_id = "FPX6zAA3tJI"  # replace with your real test video
-
     # 2. Provide some metadata (you can pull this from the YouTube Data API later)
     channel_title = "Example Travel Channel"
     tags = ["travel", "vlog", "europe", "vacation"]
@@ -190,14 +248,15 @@ if __name__ == "__main__":
 
     print(f"Is travel video? {is_travel}")
 
-    # 4. If it IS a travel video, extract countries
+    # 4. If it IS a travel video, extract structured features
     if is_travel:
-        countries = extract_countries_for_video(
+        features = extract_video_features_for_video(
             video_id=test_video_id,
             title=title,
             description=description,
             top_comments=top_comments,
         )
-        print("Extracted countries:", countries)
+        print("Extracted video features:", features)
+        # You can still access just countries with: features["countries"]
     else:
-        print("Not a travel video; skipping country extraction.")
+        print("Not a travel video; skipping feature extraction.")
