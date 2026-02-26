@@ -1,6 +1,8 @@
 # main.py
 
 import os
+from dotenv import load_dotenv
+
 from typing import List, Dict, Any
 
 from google import genai  # pip install google-genai
@@ -11,11 +13,9 @@ import numpy as np  # currently unused, but imported for later work
 import json
 import requests
 
+load_dotenv()
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-# WARNING: do NOT commit your real key to GitHub.
-# For local testing this is okay, but you should move this to an env var later.
-GEMINI_API_KEY = "change the key"  # replace with your actual Gemini API key
-#GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 client = genai.Client(
     api_key=GEMINI_API_KEY,
     http_options={"api_version": "v1beta"},
