@@ -104,7 +104,7 @@ export default function TrendingNarratives() {
           <motion.p
             key={item.id}
             onClick={() => setHovered(item)}
-            className="cursor-pointer text-2xl text-gray-300 hover:text-purple-300 transition pl-5"
+            className="cursor-pointer text-xl text-gray-300 hover:text-purple-300 transition pl-5"
             whileHover={{ x: 5 }}
           >
             “{item.title}”

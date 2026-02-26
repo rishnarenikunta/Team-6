@@ -14,7 +14,7 @@ export default function StatCard({
   return (
     <div className="
       bg-[#E4CAFF]
-      border border-[#ffffff]
+      border border-black
       rounded-2xl
       p-6
       shadow-lg

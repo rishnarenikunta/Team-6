@@ -43,9 +43,11 @@
 
 .carousel-track {
   display: flex;
-  gap: 2rem;
+  gap: 1.25rem;
   min-width: max-content;
+  padding: 0 0.5rem;
   cursor: grab;
+  scroll-snap-type: x mandatory;
 }
 
 .carousel-track:active {
@@ -57,9 +59,11 @@
 /* ===================== */
 
 .carousel-card {
-  min-width: 250px;
-  max-width: 200px;
+  flex: 0 0 260px; /* exact card width to prevent partial cuts */
+  width: 260px;
   height: 260px;
+
+  scroll-snap-align: start;
 
   background: linear-gradient(135deg, #4b4453, #3b3540);
   color: white;

@@ -1,5 +1,9 @@
+import Link from "next/link"
+import DiscoverBar from "../components/DiscoverBar"
+
 const destinations = [
   {
+    slug: "kyoto",
     name: "Kyoto",
     country: "Japan",
     signal: "Narrative momentum +12%",
@@ -9,6 +13,7 @@ const destinations = [
       "Autumn travel vlogs are spiking; viewers gravitate toward slow itineraries and neighborhood food crawls.",
   },
   {
+    slug: "lisbon",
     name: "Lisbon",
     country: "Portugal",
     signal: "Search interest +8%",
@@ -18,6 +23,7 @@ const destinations = [
       "Creators tout shoulder-season bargains and surf day-trips; mixed sentiment on short-term rental fatigue.",
   },
   {
+    slug: "mexico-city",
     name: "México City",
     country: "Mexico",
     signal: "Watch time +15%",
@@ -27,6 +33,7 @@ const destinations = [
       "Long-form food series are outperforming; audience questions center on neighborhoods and transit safety.",
   },
   {
+    slug: "seoul",
     name: "Seoul",
     country: "South Korea",
     signal: "Narrative momentum +10%",
@@ -89,6 +96,7 @@ export default function DiscoverPage() {
           </div>
         </section>
 
+
         <section className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
@@ -105,13 +113,14 @@ export default function DiscoverPage() {
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {destinations.map((city) => (
-              <article
-                key={city.name}
+              <Link
+                key={city.slug}
+                href={`/discover/${city.slug}`}
                 className="group relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-[#141420] via-[#0f0f17] to-[#0c0c12] p-5 transition hover:-translate-y-1 hover:border-white/25 hover:shadow-2xl hover:shadow-black/50"
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-xl font-semibold">{city.name}</h3>
+                    <h3 className="text-xl font-semibold group-hover:text-white">{city.name}</h3>
                     <p className="text-sm text-gray-400">{city.country}</p>
                   </div>
                   <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-xs text-emerald-300">
@@ -138,14 +147,11 @@ export default function DiscoverPage() {
                     <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_0_6px_rgba(52,211,153,0.08)]" />
                     Healthy creator mix
                   </span>
-                  <button
-                    type="button"
-                    className="font-medium text-blue-200 underline underline-offset-4 decoration-blue-200/40 transition group-hover:text-white"
-                  >
+                  <span className="font-medium text-blue-200 underline underline-offset-4 decoration-blue-200/40 transition group-hover:text-white">
                     Open dashboard
-                  </button>
+                  </span>
                 </div>
-              </article>
+              </Link>
             ))}
           </div>
         </section>

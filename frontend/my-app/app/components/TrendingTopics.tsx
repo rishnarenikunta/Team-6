@@ -25,7 +25,7 @@ export default function TrendingTopics() {
   const router = useRouter()
 
   return (
-    <div className="w-full px-8 py-8">
+    <div className="w-full px-8 py-8 text-foreground">
       {/* Section Title */}
       <h2 className="text-2xl font-semibold text-white mb-6 tracking-tight">
         Trending Topics
@@ -41,11 +41,11 @@ export default function TrendingTopics() {
               flex-shrink-0
               px-5 py-2
               text-sm font-medium
-              text-gray-300
+              text-foreground
               border border-neutral-800
               rounded-full
-              hover:border-neutral-600
-              hover:text-white
+              hover:bg-[#dd9eff]
+              hover:text-black
               hover:shadow-[0_0_12px_rgba(255,255,255,0.05)]
               transition-all duration-200
             "
