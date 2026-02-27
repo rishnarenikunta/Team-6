@@ -271,7 +271,8 @@ if __name__ == "__main__":
             description=description,
             top_comments=top_comments,
         )
-        print("Extracted video features:", features)
+        print("Extracted video features:")
+        print(json.dumps(features, indent=2))
         # You can still access just countries with: features["countries"]
     else:
         print("Not a travel video; skipping feature extraction.")
