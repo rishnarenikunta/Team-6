@@ -1,51 +1,81 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useRef } from "react";
+import { useRef, useEffect, useState } from "react";
 import "./ClaimsCarousel.css";
 
+// ── Types ─────────────────────────────────────────────────────────────────────
 
-const claims = [
-  {
-    text: "You can eat in Tokyo for under $10.",
-    source: "WonderWithMia",
-    views: "842K",
-    engagement: "9.8%",
-    growth: "+37%",
-  },
-  {
-    text: "Tokyo convenience stores are underrated.",
-    source: "TravelTomo",
-    views: "620K",
-    engagement: "8.1%",
-    growth: "+21%",
-  },
-  {
-    text: "Japan train passes save you hundreds.",
-    source: "NomadNick",
-    views: "1.2M",
-    engagement: "11.2%",
-    growth: "+42%",
-  },
-  {
-    text: "Hidden ramen spots beat tourist spots.",
-    source: "WanderNina",
-    views: "540K",
-    engagement: "7.5%",
-    growth: "+18%",
-  },
-  {
-    text: "Hidden ramen spots beat tourist spots.",
-    source: "WanderNina",
-    views: "540K",
-    engagement: "7.5%",
-    growth: "+18%",
-  }
-];
+interface Claim {
+  id: string;
+  text: string;
+  source: string;
+  views: string;
+  engagement: string;
+  growth: string;
+  destination: string;
+  verified: boolean;
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 export default function ClaimsCarousel() {
   const carouselRef = useRef<HTMLDivElement>(null);
+  const [claims, setClaims]   = useState<Claim[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState<string | null>(null);
 
+  useEffect(() => {
+    async function fetchClaims() {
+      try {
+        const res = await fetch(`${API_BASE}/api/claims/trending`);
+        if (!res.ok) throw new Error(`API error ${res.status}`);
+    
+        const data = await res.json();
+    
+        console.log("RAW API RESPONSE:", data);   // 👈 add this
+        console.log("First claim:", data[0]);     // 👈 useful
+    
+        setClaims(data);
+      } catch (err) {
+        console.error("Fetch error:", err);
+        setError("Could not load claims.");
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchClaims();
+  }, []);
+
+  // ── Loading skeleton ────────────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div className="carousel-wrapper">
+        <div className="carousel-track" style={{ pointerEvents: "none" }}>
+          {[1, 2, 3, 4].map((n) => (
+            <div
+              key={n}
+              className="carousel-card"
+              style={{ opacity: 0.4, animation: "pulse 1.5s ease-in-out infinite" }}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Error state ─────────────────────────────────────────────────────────────
+  if (error) {
+    return (
+      <div className="carousel-wrapper">
+        <p style={{ color: "#f87171", padding: "1rem", fontSize: "0.875rem" }}>{error}</p>
+      </div>
+    );
+  }
+
+  // ── Cards ───────────────────────────────────────────────────────────────────
   return (
     <div className="carousel-wrapper">
       <motion.div
@@ -55,16 +85,16 @@ export default function ClaimsCarousel() {
         dragConstraints={carouselRef}
         dragElastic={0.08}
       >
-        {claims.map((claim, index) => (
+        {claims.map((claim) => (
           <motion.div
-            key={index}
+            key={claim.id}
             className="carousel-card"
             whileHover={{ scale: 1.05, y: -8 }}
             transition={{ type: "spring", stiffness: 200, damping: 15 }}
           >
             <h3 className="card-title">Claim:</h3>
 
-            <p className="card-quote">“{claim.text}”</p>
+            <p className="card-quote">"{claim.text}"</p>
 
             <div className="card-meta">
               <p>Source: {claim.source}</p>
