@@ -6,6 +6,9 @@ from dotenv import load_dotenv
 from typing import List, Dict, Any
 
 from google import genai  # pip install google-genai
+from google.genai import types
+
+from pydantic import BaseModel, Field
 
 from sklearn.cluster import KMeans  # currently unused, but imported for later work
 import numpy as np  # currently unused, but imported for later work
@@ -65,56 +68,32 @@ def build_country_features(
     return text
 
 
-# JSON schema for structured video feature extraction
-VIDEO_FEATURES_SCHEMA = {
-    "type": "OBJECT",
-    "properties": {
-        "video_components": {
-            "type": "OBJECT",
-            "properties": {
-                "video_summary": {"type": "STRING", "description": "1-2 sentences strictly summarizing the content"},
-                "video_overview": {"type": "STRING", "description": "A detailed paragraph explaining context, tone, and purpose"},
-                "video_topics_destinations": {
-                    "type": "ARRAY",
-                    "items": {"type": "STRING"}
-                },
-                "overall_comment_analysis": {
-                    "type": "OBJECT",
-                    "properties": {
-                        "overall_sentiment": {"type": "STRING"},
-                        "general_risk_callouts": {
-                            "type": "ARRAY",
-                            "items": {"type": "STRING"}
-                        }
-                    }
-                },
-                "narratives": {
-                    "type": "ARRAY",
-                    "items": {
-                        "type": "OBJECT",
-                        "properties": {
-                            "narrative_description": {"type": "STRING"},
-                            "narrative_comment_summary": {"type": "STRING"},
-                            "narrative_comment_risk": {"type": "STRING"},
-                            "claims": {
-                                "type": "ARRAY",
-                                "items": {
-                                    "type": "OBJECT",
-                                    "properties": {
-                                        "claim_text": {"type": "STRING"},
-                                        "fact_check_assessment": {"type": "STRING"},
-                                        "claim_comment_sentiment": {"type": "STRING"},
-                                        "claim_comment_risk": {"type": "STRING"}
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
+# Pydantic schema for structured video feature extraction
+class Claim(BaseModel):
+    claim_text: str
+    fact_check_assessment: str
+    claim_comment_sentiment: str
+    claim_comment_risk: str
+
+class Narrative(BaseModel):
+    narrative_description: str
+    narrative_comment_summary: str
+    narrative_comment_risk: str
+    claims: list[Claim]
+
+class CommentAnalysis(BaseModel):
+    overall_sentiment: str
+    general_risk_callouts: list[str]
+
+class VideoComponents(BaseModel):
+    video_summary: str = Field(description="1-2 sentences strictly summarizing the content")
+    video_overview: str = Field(description="A detailed paragraph explaining context, tone, and purpose")
+    video_topics_destinations: list[str]
+    overall_comment_analysis: CommentAnalysis
+    narratives: list[Narrative]
+
+class VideoFeatures(BaseModel):
+    video_components: VideoComponents
 
 
 def extract_video_features_for_video(
@@ -155,10 +134,11 @@ def extract_video_features_for_video(
     response = client.models.generate_content(
         model=GENERATION_MODEL,
         contents=prompt,
-        config={
-            "response_mime_type": "application/json",
-            "response_schema": VIDEO_FEATURES_SCHEMA,
-        },
+        config=types.GenerateContentConfig(
+            response_mime_type="application/json",
+            response_schema=VideoFeatures,
+            temperature=0.2 # Lower temperature for more deterministic, structured outputs
+        ),
     )
 
     raw = (response.text or "").strip()
