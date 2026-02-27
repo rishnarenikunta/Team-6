@@ -157,16 +157,6 @@ def extract_video_features_for_video(
             return default_result
         
         return data
-
-        countries = data.get("countries") or []
-        places = data.get("places") or []
-        traits = data.get("traits") or []
-
-        return {
-            "countries": [str(c).strip() for c in countries if c],
-            "places": [str(p).strip() for p in places if p],
-            "traits": [str(t).strip() for t in traits if t],
-        }
     except json.JSONDecodeError:
         return default_result
 
