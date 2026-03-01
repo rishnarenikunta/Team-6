@@ -8,15 +8,17 @@ from datetime import datetime
 from dotenv import load_dotenv
 from pymongo import MongoClient
 import json
-# from google.cloud import storage
+from google.cloud import storage
 import subprocess
 from pydantic import BaseModel
 from openai import OpenAI
 
+COOKIES_PATH = os.getenv("YT_COOKIES_PATH")
+
 app = FastAPI()
 
-# BUCKET_NAME = "youtravel_transcripts"
-# storage_client = storage.Client()
+BUCKET_NAME = "youtravel_transcripts"
+storage_client = storage.Client()
 
 TRAVEL_KEYWORDS = [
     "travel", "trip", "tour", "itinerary", "vacation",
@@ -236,6 +238,13 @@ def get_transcript(video_id: str):
 
     with tempfile.TemporaryDirectory() as tmpdir:
 
+        cookies_path = os.getenv("YT_COOKIES_PATH")
+        if not cookies_path or not os.path.exists(cookies_path):
+            raise HTTPException(
+                status_code=500,
+                detail="Missing YT_COOKIES_PATH or cookies file not found. Export cookies.txt and set YT_COOKIES_PATH."
+            )
+
         def run_ytdlp(write_manual: bool, write_auto: bool):
             ydl_opts = {
                 "skip_download": True,
@@ -245,6 +254,9 @@ def get_transcript(video_id: str):
                 "subtitlesformat": "vtt",
                 "outtmpl": os.path.join(tmpdir, "%(id)s.%(ext)s"),
                 "quiet": True,
+                "cookiefile": cookies_path,
+                "ignoreconfig": True,
+                "format": "best",
             }
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 ydl.download([video_url])
@@ -276,19 +288,19 @@ def get_transcript(video_id: str):
             if not cleaned_text:
                 raise HTTPException(status_code=404, detail="Subtitle file found but no readable text extracted")
 
-            # gcs_path = upload_transcript_to_gcs(video_id, cleaned_text)
+            gcs_path = upload_transcript_to_gcs(video_id, cleaned_text)
 
-            # return {
-            #     "video_id": video_id,
-            #     "gcs_path": gcs_path,
-            #     "text": cleaned_text
-            # }
-
-            
             return {
                 "video_id": video_id,
-                 "text": cleaned_text
-             }
+                "gcs_path": gcs_path,
+                "text": cleaned_text
+            }
+
+            
+            # return {
+            #     "video_id": video_id,
+            #      "text": cleaned_text
+            #  }
 
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Parsing error: {str(e)}")
