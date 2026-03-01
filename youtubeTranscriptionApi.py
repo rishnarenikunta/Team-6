@@ -559,3 +559,61 @@ def transcribe_youtube(req: YouTubeRequest):
         raise HTTPException(status_code=400, detail="Audio file not found after download")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+
+def fetch_comments(video_id: str, n: int = 10, timeout_sec: int = 60):
+    url = f"https://www.youtube.com/watch?v={video_id}"
+    cookies = os.getenv("YT_COOKIES_PATH")
+
+    cmd = [
+        "yt-dlp",
+        "--ignore-config",
+        "--skip-download",
+        "--get-comments",
+        "--extractor-args", "youtube:comment_sort=top",  #top comments
+        "--dump-single-json",
+        url,
+    ]
+
+    if cookies and os.path.exists(cookies):
+        cmd[1:1] = ["--cookies", cookies]
+
+    try:
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=timeout_sec,
+        )
+    except subprocess.TimeoutExpired:
+        raise HTTPException(status_code=504, detail=f"Timed out fetching comments after {timeout_sec}s")
+
+    if proc.returncode != 0:
+        raise HTTPException(
+            status_code=500,
+            detail=f"yt-dlp comments error: {proc.stderr.strip() or proc.stdout.strip()}",
+        )
+
+    data = json.loads(proc.stdout)
+    comments = data.get("comments") or []
+
+    comments.sort(key=lambda c: (c.get("like_count") or 0), reverse=True)
+
+    top = []
+    for c in comments[:n]:
+        top.append({
+            "id": c.get("id"),
+            "author": c.get("author"),
+            "text": c.get("text") or c.get("content"),
+            "like_count": c.get("like_count"),
+            "timestamp": c.get("timestamp"),
+            "parent": c.get("parent"),
+        })
+
+    return top
+
+@app.get("/comments/{video_id}")
+def get_comments(video_id: str, n: int = 10, timeout_sec: int = 60):
+    if n < 1 or n > 50:
+        raise HTTPException(status_code=400, detail="n must be between 1 and 50")
+    return {"video_id": video_id, "sort": "top", "comments": fetch_comments(video_id, n=n, timeout_sec=timeout_sec)}
