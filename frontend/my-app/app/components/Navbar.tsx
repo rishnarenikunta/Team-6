@@ -18,13 +18,13 @@ export default function Navbar() {
 
         {/* Right Side */}
         <div className="flex gap-8 text-sm font-medium">
-          <Link href="/discover" className="hover:text-blue-600 transition">
+          <Link href="/discover" className="hover:text-[#c084fc] transition">
             Discover
           </Link>
-          <Link href="/narratives" className="hover:text-blue-600 transition">
+          <Link href="/narratives" className="hover:text-[#c084fc] transition">
             Narratives
           </Link>
-          <Link href="/settings" className="hover:text-blue-600 transition">
+          <Link href="/settings" className="hover:text-[#c084fc] transition">
             Settings
           </Link>
         </div>
