@@ -24,9 +24,6 @@ client = genai.Client(
     http_options={"api_version": "v1beta"},
 )
 
-for m in client.models.list():
-    print(m.name)
-
 GENERATION_MODEL = "gemini-2.5-flash-lite"
 TRANSCRIPT_BASE_URL = "http://localhost:8000"  # adjust if different host/port
 
@@ -70,12 +67,14 @@ def build_country_features(
 
 # Pydantic schema for structured video feature extraction
 class Claim(BaseModel):
+    claim_title: str = Field(description="A short succint display title for the claim")
     claim_text: str
     fact_check_assessment: str
     claim_comment_sentiment: str
     claim_comment_risk: str
 
 class Narrative(BaseModel):
+    narrative_title: str = Field(description="A short succint display title for the narrative")
     narrative_description: str
     narrative_comment_summary: str
     narrative_comment_risk: str
@@ -87,7 +86,7 @@ class CommentAnalysis(BaseModel):
 
 class VideoComponents(BaseModel):
     video_summary: str = Field(description="1-2 sentences strictly summarizing the content")
-    video_overview: str = Field(description="A detailed paragraph explaining context, tone, and purpose")
+    # video_overview: str = Field(description="A detailed paragraph explaining context, tone, and purpose")
     video_topics_destinations: list[str]
     overall_comment_analysis: CommentAnalysis
     narratives: list[Narrative]
@@ -103,7 +102,6 @@ def extract_video_features_for_video(
     top_comments: List[str],
 ) -> dict:
     transcript = fetch_transcript_from_api(video_id)
-    print(transcript[0:5000])
 
     features_text = build_country_features(
         title=title,
@@ -119,14 +117,16 @@ def extract_video_features_for_video(
         f"{features_text}"
         "\nINSTRUCTIONS:\n"
         "1. Video Summary: Provide a concise, 1-2 sentence summary of what the video is about."
-        "2. Video Overview: Provide a broader contextual paragraph detailing the video's purpose, tone, and main message based on the metadata and transcript."
-        "3. Topics/Destinations: Extract the primary subjects, entities, or physical locations discussed in the video."
-        "4. Overall Comment Analysis: Analyze the comments to determine the overall sentiment and identify any general risk callouts (e.g., hate speech, spam, widespread misinformation, dangerous acts)."
-        "5. Narratives & Claims: Break down the video into its core 'Narratives' (overarching themes or stories). For each Narrative, identify the specific 'Claims' (verifiable statements) made."
-        "6. Risk Assessment Constraint: Whenever you are asked to assess 'risk' (for the overall video, per narrative, or per claim), you MUST derive this risk by combining three factors:"
+        # "2. Video Overview: Provide a broader contextual paragraph detailing the video's purpose, tone, and main message based on the metadata and transcript."
+        "2. Destinations: Extract the primary physical countries discussed or visited in the video. Only include those that are a central topic or destination in the video."
+        "3. Overall Comment Analysis: Analyze the comments to determine the overall sentiment and identify any general risk callouts (e.g., hate speech, spam, widespread misinformation, dangerous acts)."
+        "4. Narratives & Claims: Break down the transcript into its overarching themes or opinions about the location (Narratives). Under each Narrative, list the specific reasons or features the speaker highlights to prove that point (Claims)."
+        "\n(a) CRITICAL INSTRUCTIONS: DO NOT summarize the plot or recount what the speaker did chronologically (e.g., avoid 'They went to the museum and then ate dinner')."
+        "\n(b) DO extract qualitative judgments and actionable insights (e.g., 'The local food scene is highly accessible for vegans,' supported by claims like 'Every restaurant had plant-based menus')."
+        "5. Risk Assessment Constraint: Whenever you are asked to assess 'risk' (for the overall video, per narrative, or per claim), you MUST derive this risk by combining three factors:"
         "\na. The sentiment of the comments regarding that specific topic."
         "\nb. A summary of what the comments are saying about it."
-        "\nc. A logical fact-check of the narrative/claim based on the provided text and basic common sense."
+        "\nc. A logical fact-check of the narrative/claim based on the provided text, search, and basic common sense."
         "\nOUTPUT FORMAT:\n"
         "You must output your response EXACTLY matching the output JSON structure. Return ONLY valid JSON. Do not include markdown formatting like ```json or any introductory text."
     )
