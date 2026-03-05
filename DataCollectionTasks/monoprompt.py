@@ -1,10 +1,10 @@
 # main.py
 
+from curses import raw
 import os
 from dotenv import load_dotenv
 
-from typing import List, Dict, Any
-
+from typing import List, Dict, Any, Optional
 from google import genai  # pip install google-genai
 from google.genai import types
 
@@ -21,8 +21,12 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 client = genai.Client(
     api_key=GEMINI_API_KEY,
-    http_options={"api_version": "v1beta"},
+  #  http_options={"api_version": "v1beta"},
 )
+
+# PRINT AVAILABLE MODELS
+# for m in client.models.list():
+#     print(m.name)
 
 GENERATION_MODEL = "gemini-2.5-flash-lite"
 TRANSCRIPT_BASE_URL = "http://localhost:8000"  # adjust if different host/port
@@ -94,6 +98,29 @@ class VideoComponents(BaseModel):
 class VideoFeatures(BaseModel):
     video_components: VideoComponents
 
+# Embedding model for narrative title and claim title
+
+EMBEDDING_MODEL = "models/gemini-embedding-001"  
+
+# def embed_text(text: str) -> Optional[List[float]]:
+#     text = (text or "").strip()
+#     if not text:
+#         return None
+
+#     response = client.models.embed_content(
+#         model=EMBEDDING_MODEL,
+#         contents=text,
+#     )
+#     # google-genai: embeddings[0].values
+#     emb = response.embeddings[0].values
+#     return emb
+def embed_texts(texts: List[str], model: str = EMBEDDING_MODEL) -> List[List[float]]:
+    # filter or keep blank; here we keep order and embed as-is
+    response = client.models.embed_content(
+        model=model,
+        contents=texts,
+    )
+    return [e.values for e in response.embeddings]
 
 def extract_video_features_for_video(
     video_id: str,
@@ -143,24 +170,119 @@ def extract_video_features_for_video(
 
     raw = (response.text or "").strip()
 
-    default_result: Dict[str, List[str]] = {
-        "countries": [],
-        "places": [],
-        "traits": [],
+    default_result: Dict[str, Any] = {
+    "video_components": {
+        "video_summary": "",
+        "video_topics_destinations": [],
+        "overall_comment_analysis": {
+            "overall_sentiment": "",
+            "general_risk_callouts": [],
+        },
+        "narratives": [],
+        }
     }
+
     if not raw:
         return default_result
 
     try:
-        data = json.loads(raw)
-        if not isinstance(data, dict):
-            return default_result
-        
-        return data
+            data = json.loads(raw)
+            _ = VideoFeatures(**data)
+            print(data)
+            filename = f"features_{video_id}.json"
+            with open(filename, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+
+            features_with_embedding: Dict[str, Any] = data
+
+            video_components = features_with_embedding.get("video_components", {})
+            narratives = video_components.get("narratives", [])
+            print("NARRATIVES BEFORE EMBEDDING:")
+            for i, n in enumerate(narratives):
+                print(i, n.get("narrative_title"))
+
+            # 1) collect all titles
+            narrative_titles = []
+            narrative_index = []
+            claim_titles = []
+            claim_index = []
+
+            if isinstance(narratives, list):
+                for n_idx, narrative in enumerate(narratives):
+                    nt = narrative.get("narrative_title")
+                    print("Checking narrative idx", n_idx, "title:", repr(nt))
+                    if isinstance(nt, str) and nt.strip():
+                        narrative_index.append(n_idx)
+                        narrative_titles.append(nt)
+
+                    claims = narrative.get("claims", [])
+                    if isinstance(claims, list):
+                        for c_idx, claim in enumerate(claims):
+                            ct = claim.get("claim_title")
+                            print("  Checking claim idx", c_idx, "title:", repr(ct))
+                            if isinstance(ct, str) and ct.strip():
+                                claim_index.append((n_idx, c_idx))
+                                claim_titles.append(ct)
+
+            print("NARRATIVE INDEX:", narrative_index)
+            print("CLAIM INDEX:", claim_index)
+            print("NARRATIVE TITLES:", narrative_titles)
+            print("CLAIM TITLES:", claim_titles)
+
+            # 2) embed all narrative titles
+            if narrative_titles:
+                nt_embs = embed_texts(narrative_titles)
+                print("NARRATIVE EMBEDDINGS LEN:", len(nt_embs))
+                for (n_idx, emb) in zip(narrative_index, nt_embs):
+                    print("Assigning narrative_title_embedding to idx", n_idx)
+                    narratives[n_idx]["narrative_title_embedding"] = emb
+
+            # 3) embed all claim titles
+            if claim_titles:
+                ct_embs = embed_texts(claim_titles)
+                print("CLAIM EMBEDDINGS LEN:", len(ct_embs))
+                for ((n_idx, c_idx), emb) in zip(claim_index, ct_embs):
+                    print("Assigning claim_title_embedding to", (n_idx, c_idx))
+                    narratives[n_idx]["claims"][c_idx]["claim_title_embedding"] = emb
+
+            # 1) collect all titles
+            narrative_titles = []
+            claim_titles = []
+            narrative_index = []  # (n_idx)
+            claim_index = []      # (n_idx, c_idx)
+
+            if isinstance(narratives, list):
+                for n_idx, narrative in enumerate(narratives):
+                    nt = narrative.get("narrative_title")
+                    if isinstance(nt, str) and nt.strip():
+                        narrative_index.append(n_idx)
+                        narrative_titles.append(nt)
+
+                    claims = narrative.get("claims", [])
+                    if isinstance(claims, list):
+                        for c_idx, claim in enumerate(claims):
+                            ct = claim.get("claim_title")
+                            if isinstance(ct, str) and ct.strip():
+                                claim_index.append((n_idx, c_idx))
+                                claim_titles.append(ct)
+
+            # 2) embed all narrative titles at once
+            if narrative_titles:
+                nt_embs = embed_texts(narrative_titles)
+                for (n_idx, emb) in zip(narrative_index, nt_embs):
+                    narratives[n_idx]["narrative_title_embedding"] = emb
+
+            # 3) embed all claim titles at once
+            if claim_titles:
+                ct_embs = embed_texts(claim_titles)
+                for ((n_idx, c_idx), emb) in zip(claim_index, ct_embs):
+                    narratives[n_idx]["claims"][c_idx]["claim_title_embedding"] = emb
+
+            return features_with_embedding
+
     except json.JSONDecodeError:
         return default_result
-
-
+    
 def build_travel_prompt(
     channel_title: str,
     tags: List[str],
@@ -255,6 +377,8 @@ if __name__ == "__main__":
 
     # 4. If it IS a travel video, extract structured features
     if is_travel:
+
+        #this is the features
         features = extract_video_features_for_video(
             video_id=test_video_id,
             title=title,
@@ -263,6 +387,31 @@ if __name__ == "__main__":
         )
         print("Extracted video features:")
         print(json.dumps(features, indent=2))
+        safe_title = "".join(c if c.isalnum() or c in "._-" else "_" for c in title)
+        filename = f"features_{safe_title}.json"
+
+        with open(filename, "w", encoding="utf-8") as f:
+            json.dump(features, f, indent=2, ensure_ascii=False)
+
+        print(f"Saved features to {filename}")
+        #sanity check for embedding vector shape : PASS
+        # vec = np.array(features["video_components"]["narratives"][0]["claims"][0]["claim_title_embedding"], dtype=float)
+        # print("Dim:", vec.shape[0])
+        # print("Min:", vec.min(), "Max:", vec.max())
+        # print("Norm:", np.linalg.norm(vec))
         # You can still access just countries with: features["countries"]
     else:
         print("Not a travel video; skipping feature extraction.")
+
+
+# TO DO
+# LATER
+    # - Add more robust error handling and logging
+    # - Consider adding a feedback loop where you can correct the model's output and have it learn from those corrections over time (e.g., using few-shot examples or fine-tuning on a labeled
+    #   dataset of travel videos with known features)
+
+# CONNECT TO EMBEDDING MODEL ... gemini 
+# use the ttext-embedding-004 model to create embeddings for the extracted features and store those embeddings in a vector database for later retrieval and similarity search.
+# features to emed: 
+# CREATE A THE EMBEDDINGS AND ADD IT TO THE FEATURES THING AS A JSON ENTRY..
+# sene a post request with video id and the features to a new endpoint in the fastapi server that will store the features in a database for later retrieval and use in a search index or something
