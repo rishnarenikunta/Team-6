@@ -1,14 +1,7 @@
-"""
-backend/api.py
 
-WHERE TO RUN THIS:
-  1. Open a terminal
-  2. cd into your backend folder  (e.g.  cd my-project/backend)
-  3. Run:  uvicorn api:app --reload --port 8000
+#3. Run:  uvicorn api:app --reload --port 8000
+#look at how to store information into the mongo table 
 
-Your Next.js frontend (on port 3000) will then be able to reach
-http://localhost:8000/api/...  without CORS errors.
-"""
 import os
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
@@ -20,7 +13,7 @@ load_dotenv()
 
 app = FastAPI(title="Travel App API")
 
-# ── CORS ──────────────────────────────────────────────────────────────────────
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000"],  # add your production URL here later
@@ -28,7 +21,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── DB ────────────────────────────────────────────────────────────────────────
+
 client = MongoClient(os.getenv("MONGODB_URI"))
 db = client["travel_app"]
 
@@ -38,8 +31,7 @@ SIGNAL_LABELS = {
     "watch_time":         "Watch time",
 }
 
-# ── /api/claims/trending  (powers ClaimsCarousel) ─────────────────────────────
-
+# for claimsCarosol
 @app.get("/api/claims/trending")
 def get_trending_claims() -> list[dict[str, Any]]:
     """
