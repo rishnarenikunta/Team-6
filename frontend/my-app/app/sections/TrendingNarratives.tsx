@@ -91,26 +91,26 @@ export default function TrendingNarratives() {
   const [hovered, setHovered] = useState<Narrative | null>(narratives[0]);
 
   return (
-    <div className="w-full h-dvh p-8 mt-6">
-      <h2 className="text-3xl font-semibold text-white tracking-tight mb-2">
+    <div className="w-full mt-10 h-fit mb-50">
+      <h2 className="text-2xl font-semibold text-white tracking-tight mb-2">
         Trending Narratives
       </h2>
       <p className="text-sm text-neutral-400 border-b border-neutral-800 pb-4 mb-4">Narratives represent AI-clustered story themes emerging across travel videos.</p>
-    <div className="relative flex gap-16 text-white">
+      <div className="relative flex gap-16 text-white">
 
-      {/* LEFT SIDE LIST */}
-      <div className="flex flex-col gap-4 w-1/2 mt-8">
-        {narratives.map((item) => (
-          <motion.p
-            key={item.id}
-            onClick={() => setHovered(item)}
-            className="cursor-pointer text-xl text-gray-300 hover:text-purple-300 transition pl-5"
-            whileHover={{ x: 5 }}
-          >
-            “{item.title}”
-          </motion.p>
-        ))}
-      </div>
+        {/* LEFT SIDE LIST */}
+        <div className="flex flex-col gap-4 w-1/2 mt-8">
+          {narratives.map((item) => (
+            <motion.p
+              key={item.id}
+              onClick={() => setHovered(item)}
+              className="cursor-pointer text-xl text-gray-300 hover:text-purple-300 transition pl-5"
+              whileHover={{ x: 5 }}
+            >
+              “{item.title}”
+            </motion.p>
+          ))}
+        </div>
 
       {/* FLOATING BUBBLE */}
       <AnimatePresence>

@@ -3,51 +3,48 @@
 import { useRouter } from "next/navigation"
 
 const topics = [
+  "kyoto",
   "seoul",
-  "south korea",
-  "gyeongju",
+  "lisbon",
   "europe",
   "paris",
   "london",
   "maldives",
   "tokyo",
   "bali",
-  "sydney",
-  "dubai",
-  "rome",
-  "barcelona",
-  "singapore",
-  "new york",
-  "los angeles"
+  "sydney"
 ]
 
 export default function TrendingTopics() {
   const router = useRouter()
 
   return (
-    <div className="w-full px-8 py-8 text-foreground">
+    <div className="w-full pt-6 text-foreground space-y-3">
       {/* Section Title */}
-      <h2 className="text-2xl font-semibold text-white mb-6 tracking-tight">
+      <h2 className="text-sm font-semibold text-gray-300">
         Trending Topics
       </h2>
 
       {/* Scroll Container */}
-      <div className="flex gap-3 overflow-x-auto whitespace-nowrap no-scrollbar">
+      <div className="flex flex-wrap gap-3 py-2 max-w-full md:flex-nowrap md:overflow-x-auto md:whitespace-nowrap md:no-scrollbar">
         {topics.map((topic) => (
           <button
             key={topic}
-            onClick={() => router.push(`/discover?q=${topic}`)}
+            onClick={() => router.push(`/discover/${topic}`)}
             className="
-              flex-shrink-0
-              px-5 py-2
-              text-sm font-medium
-              text-foreground
-              border border-neutral-800
               rounded-full
-              hover:bg-[#dd9eff]
-              hover:text-black
-              hover:shadow-[0_0_12px_rgba(255,255,255,0.05)]
-              transition-all duration-200
+              border 
+              border-white/10 
+              bg-white/5 
+              px-4 
+              py-2 
+              text-xs 
+              text-gray-200 
+              transition 
+              hover:-translate-y-0.5 
+              hover:border-white/25 
+              hover:bg-[#E4CAFF] 
+              hover:text-[#1c1b22]
             "
           >
             {topic}

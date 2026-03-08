@@ -9,6 +9,25 @@ type Claim = {
   growth: string
 }
 
+type VideoClaim = {
+  title: string
+  text: string
+  risk: "low" | "medium" | "high"
+}
+
+type VideoDetail = {
+  title: string
+  channel: string
+  views: string
+  published: string
+  claim: string
+  thumb: string
+  summary: string
+  sentiment: "positive" | "neutral" | "negative"
+  riskCallouts: string[]
+  claims: VideoClaim[]
+}
+
 type NarrativeDetail = {
   slug: string
   title: string
@@ -21,14 +40,7 @@ type NarrativeDetail = {
   sentiment: "positive" | "neutral" | "negative"
   topCreators: string[]
   claims: Claim[]
-  videos: {
-    title: string
-    channel: string
-    views: string
-    published: string
-    claim: string
-    thumb: string
-  }[]
+  videos: VideoDetail[]
 }
 
 const narratives: NarrativeDetail[] = [
@@ -51,10 +63,66 @@ const narratives: NarrativeDetail[] = [
       { text: "Local buses + trains cover most rural loops without renting a car.", source: "WanderNina", views: "540K", engagement: "7.5%", growth: "+18%" },
     ],
     videos: [
-      { title: "5-Day Rural Rail Loop in Kansai", channel: "NomadNick", views: "1.2M", published: "2 weeks ago", claim: "Rural passes beat city passes on cost.", thumb: "https://images.unsplash.com/photo-1528164344705-47542687000d?auto=format&fit=crop&w=600&q=60" },
-      { title: "Izakaya Crawl in Small-Town Japan", channel: "WonderWithMia", views: "842K", published: "1 month ago", claim: "$10 meals outside the big cities.", thumb: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=600&q=60" },
-      { title: "Onsen Towns vs Kyoto Crowds", channel: "TravelTomo", views: "620K", published: "3 weeks ago", claim: "Less-crowded onsen towns equal scenery.", thumb: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=600&q=60" },
-      { title: "No-Car Countryside Itinerary", channel: "WanderNina", views: "540K", published: "10 days ago", claim: "Loop by bus + train without renting a car.", thumb: "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=600&q=60" },
+      {
+        title: "5-Day Rural Rail Loop in Kansai",
+        channel: "NomadNick",
+        views: "1.2M",
+        published: "2 weeks ago",
+        claim: "Rural passes beat city passes on cost.",
+        thumb: "https://images.unsplash.com/photo-1528164344705-47542687000d?auto=format&fit=crop&w=600&q=60",
+        summary: "Nick rides local lines and countryside buses to show a 5-day loop that avoids Tokyo crowds.",
+        sentiment: "positive",
+        riskCallouts: ["Rail pass prices vary by season", "Local buses run less frequently after 21:00"],
+        claims: [
+          { title: "Cheaper than subway passes", text: "Regional passes cover unlimited rides for ~$40/day.", risk: "low" },
+          { title: "Walkable towns", text: "Most onsen towns are compact enough to skip car rentals.", risk: "medium" },
+        ],
+      },
+      {
+        title: "Izakaya Crawl in Small-Town Japan",
+        channel: "WonderWithMia",
+        views: "842K",
+        published: "1 month ago",
+        claim: "$10 meals outside the big cities.",
+        thumb: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=600&q=60",
+        summary: "Mia compares izakaya pricing between Osaka and rural stops, highlighting budget meals.",
+        sentiment: "positive",
+        riskCallouts: ["Menu pricing can change with seasonal fish", "Cash-only shops common"],
+        claims: [
+          { title: "Budget meals", text: "You can find full meals under $10 USD in small towns.", risk: "low" },
+          { title: "Cash heavy", text: "70% of shops preferred cash; cards were spotty.", risk: "medium" },
+        ],
+      },
+      {
+        title: "Onsen Towns vs Kyoto Crowds",
+        channel: "TravelTomo",
+        views: "620K",
+        published: "3 weeks ago",
+        claim: "Less-crowded onsen towns equal scenery.",
+        thumb: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=600&q=60",
+        summary: "Tomo contrasts visitor density and scenery between Kyoto and smaller onsen towns.",
+        sentiment: "positive",
+        riskCallouts: ["Some towns close shops by 21:30", "Bath etiquette rules vary"],
+        claims: [
+          { title: "Lower crowds", text: "Weeknight visits had ~60% fewer tourists than Kyoto.", risk: "low" },
+          { title: "Transit tradeoff", text: "Fewer late-night buses after 22:00; plan returns earlier.", risk: "medium" },
+        ],
+      },
+      {
+        title: "No-Car Countryside Itinerary",
+        channel: "WanderNina",
+        views: "540K",
+        published: "10 days ago",
+        claim: "Loop by bus + train without renting a car.",
+        thumb: "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=600&q=60",
+        summary: "Nina proves you can do the Kansai countryside loop with buses and JR lines only.",
+        sentiment: "positive",
+        riskCallouts: ["Winter weather may cancel rural buses", "Accessibility varies by station"],
+        claims: [
+          { title: "No car needed", text: "Loop completed with public transit only.", risk: "low" },
+          { title: "Check bus timings", text: "Gaps of 60–90 mins on some rural routes.", risk: "medium" },
+        ],
+      },
     ],
   },
   {
@@ -75,9 +143,51 @@ const narratives: NarrativeDetail[] = [
       { text: "Short-term rentals drop 15-25% after October 10th.", source: "EuroNomad", views: "502K", engagement: "8.4%", growth: "+19%" },
     ],
     videos: [
-      { title: "Shoulder Season in Algarve", channel: "PocketPorto", views: "355K", published: "3 weeks ago", claim: "Bundle ferry+train to save 20%.", thumb: "https://images.unsplash.com/photo-1505761671935-60b3a7427bad?auto=format&fit=crop&w=600&q=60" },
-      { title: "Lisbon to Malta on a Budget", channel: "EuroNomad", views: "502K", published: "1 month ago", claim: "Rentals drop 15-25% after Oct 10.", thumb: "https://images.unsplash.com/photo-1505764706515-aa95265c5abc?auto=format&fit=crop&w=600&q=60" },
-      { title: "Sea Temps in October", channel: "SailWithSami", views: "410K", published: "2 weeks ago", claim: "Still swimmable mid-October.", thumb: "https://images.unsplash.com/photo-1505761671935-60b3a7427bad?auto=format&fit=crop&w=600&q=60" },
+      {
+        title: "Shoulder Season in Algarve",
+        channel: "PocketPorto",
+        views: "355K",
+        published: "3 weeks ago",
+        claim: "Bundle ferry+train to save 20%.",
+        thumb: "https://images.unsplash.com/photo-1505761671935-60b3a7427bad?auto=format&fit=crop&w=600&q=60",
+        summary: "Porto shows how combining ferries and regional trains trims costs in October.",
+        sentiment: "positive",
+        riskCallouts: ["Weather can swing rainy", "Some ferries reduce frequency mid-week"],
+        claims: [
+          { title: "20% savings", text: "Mixing ferries and trains lowered island-hop costs by ~20%.", risk: "low" },
+          { title: "Flexible days", text: "Savings require shifting legs to mid-week sailings.", risk: "medium" },
+        ],
+      },
+      {
+        title: "Lisbon to Malta on a Budget",
+        channel: "EuroNomad",
+        views: "502K",
+        published: "1 month ago",
+        claim: "Rentals drop 15-25% after Oct 10.",
+        thumb: "https://images.unsplash.com/photo-1505764706515-aa95265c5abc?auto=format&fit=crop&w=600&q=60",
+        summary: "Breakdown of airfare bundles and short-stay pricing once peak season ends.",
+        sentiment: "positive",
+        riskCallouts: ["Prices rebound around local holidays", "Fewer direct flights after November"],
+        claims: [
+          { title: "Rental drop", text: "Listings in Lisbon and Malta fell 15–25% after Oct 10.", risk: "low" },
+          { title: "Flight caveat", text: "Direct flights thin out; connections may add 3–5 hrs.", risk: "medium" },
+        ],
+      },
+      {
+        title: "Sea Temps in October",
+        channel: "SailWithSami",
+        views: "410K",
+        published: "2 weeks ago",
+        claim: "Still swimmable mid-October.",
+        thumb: "https://images.unsplash.com/photo-1505761671935-60b3a7427bad?auto=format&fit=crop&w=600&q=60",
+        summary: "Sami charts water temps across the Med and shows where swimming stays comfortable.",
+        sentiment: "positive",
+        riskCallouts: ["Weather volatility in late October", "Jellyfish spikes after storms"],
+        claims: [
+          { title: "Warm water pockets", text: "Sea temps stayed 20–23°C through late October.", risk: "low" },
+          { title: "Storm caveat", text: "Early storms briefly cooled bays by 1–2°C.", risk: "medium" },
+        ],
+      },
     ],
   },
   {
@@ -98,9 +208,51 @@ const narratives: NarrativeDetail[] = [
       { text: "Neighborhood split: Roma/Condesa safer but pricier; Juarez rising.", source: "NomadNora", views: "476K", engagement: "8.6%", growth: "+17%" },
     ],
     videos: [
-      { title: "CDMX Metro After Dark", channel: "ChilangoCheck", views: "288K", published: "5 days ago", claim: "$5 ride-hail vs $2 metro at night.", thumb: "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=600&q=60" },
-      { title: "Where Pickpockets Strike", channel: "DataDriftCDMX", views: "331K", published: "2 weeks ago", claim: "Line 3 & 5 worst at rush hour.", thumb: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=600&q=60" },
-      { title: "Choosing a CDMX Neighborhood", channel: "NomadNora", views: "476K", published: "1 month ago", claim: "Roma/Condesa safer; Juarez rising.", thumb: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=600&q=60" },
+      {
+        title: "CDMX Metro After Dark",
+        channel: "ChilangoCheck",
+        views: "288K",
+        published: "5 days ago",
+        claim: "$5 ride-hail vs $2 metro at night.",
+        thumb: "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=600&q=60",
+        summary: "Nighttime metro vs ride-hail comparison with cost and safety anecdotes.",
+        sentiment: "neutral",
+        riskCallouts: ["Crowding spikes on Line 3/5", "Ride-hail surge after concerts"],
+        claims: [
+          { title: "Ride-hail cost", text: "Cross-city rides average ~$5 USD after 11pm.", risk: "medium" },
+          { title: "Metro tradeoff", text: "Cheaper at $2 but higher pickpocket risk on Line 3/5.", risk: "high" },
+        ],
+      },
+      {
+        title: "Where Pickpockets Strike",
+        channel: "DataDriftCDMX",
+        views: "331K",
+        published: "2 weeks ago",
+        claim: "Line 3 & 5 worst at rush hour.",
+        thumb: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=600&q=60",
+        summary: "Data-driven look at incident heatmaps across metro lines.",
+        sentiment: "neutral",
+        riskCallouts: ["Data lags by 2–3 weeks", "Police presence varies nightly"],
+        claims: [
+          { title: "Hot lines", text: "Lines 3 and 5 log most reports 7–9am and 6–9pm.", risk: "high" },
+          { title: "Safer windows", text: "Midday rides see far fewer incidents.", risk: "medium" },
+        ],
+      },
+      {
+        title: "Choosing a CDMX Neighborhood",
+        channel: "NomadNora",
+        views: "476K",
+        published: "1 month ago",
+        claim: "Roma/Condesa safer; Juarez rising.",
+        thumb: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=600&q=60",
+        summary: "Nora compares three central neighborhoods for visitors with night transit tips.",
+        sentiment: "neutral",
+        riskCallouts: ["Short-term rental rules changing", "Safety perceptions vary block-to-block"],
+        claims: [
+          { title: "Area split", text: "Roma/Condesa favored for safety but pricier.", risk: "medium" },
+          { title: "Juarez emerging", text: "Cheaper stays but mixed late-night reviews.", risk: "medium" },
+        ],
+      },
     ],
   },
   {
@@ -121,9 +273,51 @@ const narratives: NarrativeDetail[] = [
       { text: "Wild camping tolerated outside national parks; check local bylaws.", source: "NomadNorthStar", views: "121K", engagement: "5.5%", growth: "+9%" },
     ],
     videos: [
-      { title: "6-Day Kotor to Ohrid Loop", channel: "RoadsAndRila", views: "143K", published: "2 weeks ago", claim: "Loop doable in 6 days with two ferries.", thumb: "https://images.unsplash.com/photo-1505764706515-aa95265c5abc?auto=format&fit=crop&w=600&q=60" },
-      { title: "Vanlife Costs in the Balkans", channel: "VanVidaLena", views: "189K", published: "1 month ago", claim: "Cross-border rentals add €10/day.", thumb: "https://images.unsplash.com/photo-1505761671935-60b3a7427bad?auto=format&fit=crop&w=600&q=60" },
-      { title: "Wild Camping Rules Explained", channel: "NomadNorthStar", views: "121K", published: "3 weeks ago", claim: "Tolerated outside national parks.", thumb: "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=600&q=60" },
+      {
+        title: "6-Day Kotor to Ohrid Loop",
+        channel: "RoadsAndRila",
+        views: "143K",
+        published: "2 weeks ago",
+        claim: "Loop doable in 6 days with two ferries.",
+        thumb: "https://images.unsplash.com/photo-1505764706515-aa95265c5abc?auto=format&fit=crop&w=600&q=60",
+        summary: "Route, ferries, and toll costs for a 6-day Balkan loop without rushing.",
+        sentiment: "positive",
+        riskCallouts: ["Border waits vary by hour", "Ferry schedules can slip in storms"],
+        claims: [
+          { title: "Two ferries only", text: "Managed the loop with two short ferry legs.", risk: "low" },
+          { title: "Border timing", text: "Cross before 10am to avoid queues.", risk: "medium" },
+        ],
+      },
+      {
+        title: "Vanlife Costs in the Balkans",
+        channel: "VanVidaLena",
+        views: "189K",
+        published: "1 month ago",
+        claim: "Cross-border rentals add €10/day.",
+        thumb: "https://images.unsplash.com/photo-1505761671935-60b3a7427bad?auto=format&fit=crop&w=600&q=60",
+        summary: "Lena breaks down rental surcharges, fuel, and camping fees for vans.",
+        sentiment: "positive",
+        riskCallouts: ["Insurance rules change by country", "Cash-only tolls in rural areas"],
+        claims: [
+          { title: "Rental surcharge", text: "Cross-border van rental added ~€10/day.", risk: "medium" },
+          { title: "Fuel variability", text: "Diesel prices swing 8–12% between borders.", risk: "medium" },
+        ],
+      },
+      {
+        title: "Wild Camping Rules Explained",
+        channel: "NomadNorthStar",
+        views: "121K",
+        published: "3 weeks ago",
+        claim: "Tolerated outside national parks.",
+        thumb: "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=600&q=60",
+        summary: "Covers legality and etiquette for wild camping across the Balkans.",
+        sentiment: "neutral",
+        riskCallouts: ["Local bylaws can differ by municipality", "Seasonal fire bans common"],
+        claims: [
+          { title: "Outside parks OK", text: "Wild camping generally tolerated outside parks.", risk: "medium" },
+          { title: "Fire bans", text: "Summer fire bans limit cooking fuel options.", risk: "high" },
+        ],
+      },
     ],
   },
   {
@@ -144,9 +338,51 @@ const narratives: NarrativeDetail[] = [
       { text: "Airport line and night buses cover most markets until ~1am.", source: "TransitTae", views: "402K", engagement: "7.1%", growth: "+15%" },
     ],
     videos: [
-      { title: "Hongdae Merch Streets at Midnight", channel: "KWaveKait", views: "654K", published: "1 week ago", claim: "Merch streets stay open past midnight.", thumb: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=600&q=60" },
-      { title: "Night Bus vs Subway in Seoul", channel: "TransitTae", views: "402K", published: "2 weeks ago", claim: "Airport line + night buses cover markets till ~1am.", thumb: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=600&q=60" },
-      { title: "Street Food Peak Hours", channel: "SeoulSnacks", views: "710K", published: "5 days ago", claim: "Myeongdong lines drop after 11:15pm.", thumb: "https://images.unsplash.com/photo-1505761671935-60b3a7427bad?auto=format&fit=crop&w=600&q=60" },
+      {
+        title: "Hongdae Merch Streets at Midnight",
+        channel: "KWaveKait",
+        views: "654K",
+        published: "1 week ago",
+        claim: "Merch streets stay open past midnight.",
+        thumb: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=600&q=60",
+        summary: "Walkthrough of Hongdae merch alleys with timestamps and late-night safety notes.",
+        sentiment: "positive",
+        riskCallouts: ["Crowds dense till midnight", "Card-only in some pop-up shops"],
+        claims: [
+          { title: "Open late", text: "Most shops stayed open past 00:15 on weekends.", risk: "low" },
+          { title: "Cash vs card", text: "Some pop-ups were card-only despite signage.", risk: "medium" },
+        ],
+      },
+      {
+        title: "Night Bus vs Subway in Seoul",
+        channel: "TransitTae",
+        views: "402K",
+        published: "2 weeks ago",
+        claim: "Airport line + night buses cover markets till ~1am.",
+        thumb: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=600&q=60",
+        summary: "Transit options after midnight including night buses, subway last trains, and safety.",
+        sentiment: "positive",
+        riskCallouts: ["Schedules shift on holidays", "Late taxis can surge near concerts"],
+        claims: [
+          { title: "1am coverage", text: "Night buses run at 20–30 min intervals until ~1am.", risk: "low" },
+          { title: "Last trains", text: "Airport line last departures vary by station; check before 00:10.", risk: "medium" },
+        ],
+      },
+      {
+        title: "Street Food Peak Hours",
+        channel: "SeoulSnacks",
+        views: "710K",
+        published: "5 days ago",
+        claim: "Myeongdong lines drop after 11:15pm.",
+        thumb: "https://images.unsplash.com/photo-1505761671935-60b3a7427bad?auto=format&fit=crop&w=600&q=60",
+        summary: "Food stall walkthrough showing when lines fade and what sells out first.",
+        sentiment: "positive",
+        riskCallouts: ["Oil reuse concerns at some stalls", "Popular items sell out by 23:00"],
+        claims: [
+          { title: "Line timing", text: "Lines eased after 23:15 on weekdays.", risk: "low" },
+          { title: "Sell-outs", text: "Top items (cheese sticks) sold out around 23:00.", risk: "medium" },
+        ],
+      },
     ],
   },
   {
@@ -167,12 +403,55 @@ const narratives: NarrativeDetail[] = [
       { text: "Yosemite sunrise at Tunnel View has <10 cars in January weekdays.", source: "PeakPixel", views: "139K", engagement: "5.8%", growth: "+9%" },
     ],
     videos: [
-      { title: "Winter in Zion: Shuttle Off", channel: "TrailTessa", views: "211K", published: "3 weeks ago", claim: "Personal cars allowed most days in winter.", thumb: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=600&q=60" },
-      { title: "Booking Yellowstone Snowcoach", channel: "FrostyFootprints", views: "167K", published: "1 month ago", claim: "Book snowcoach 4+ weeks early.", thumb: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=600&q=60" },
-      { title: "Yosemite Sunrise in January", channel: "PeakPixel", views: "139K", published: "10 days ago", claim: "Tunnel View has <10 cars on weekdays.", thumb: "https://images.unsplash.com/photo-1505764706515-aa95265c5abc?auto=format&fit=crop&w=600&q=60" },
+      {
+        title: "Winter in Zion: Shuttle Off",
+        channel: "TrailTessa",
+        views: "211K",
+        published: "3 weeks ago",
+        claim: "Personal cars allowed most days in winter.",
+        thumb: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=600&q=60",
+        summary: "What changes when Zion shuttle pauses and how to time parking.",
+        sentiment: "positive",
+        riskCallouts: ["Road closures after snow", "Parking lots fill by 9am on holidays"],
+        claims: [
+          { title: "Drive yourself", text: "Winter allows personal cars through the canyon.", risk: "low" },
+          { title: "Parking caveat", text: "Arrive before 9am on holiday weekends.", risk: "medium" },
+        ],
+      },
+      {
+        title: "Booking Yellowstone Snowcoach",
+        channel: "FrostyFootprints",
+        views: "167K",
+        published: "1 month ago",
+        claim: "Book snowcoach 4+ weeks early.",
+        thumb: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=600&q=60",
+        summary: "How to secure snowcoach seats and what basins stay open.",
+        sentiment: "positive",
+        riskCallouts: ["Limited seats during storms", "Thermal areas can close same-day"],
+        claims: [
+          { title: "Book early", text: "Snowcoach tours sold out 4–6 weeks ahead.", risk: "medium" },
+          { title: "Weather swings", text: "Storms can cancel routes with short notice.", risk: "high" },
+        ],
+      },
+      {
+        title: "Yosemite Sunrise in January",
+        channel: "PeakPixel",
+        views: "139K",
+        published: "10 days ago",
+        claim: "Tunnel View has <10 cars on weekdays.",
+        thumb: "https://images.unsplash.com/photo-1505764706515-aa95265c5abc?auto=format&fit=crop&w=600&q=60",
+        summary: "Crowd levels, icy roads, and photo tips for sunrise spots.",
+        sentiment: "positive",
+        riskCallouts: ["Chains often required", "Trail closures change weekly"],
+        claims: [
+          { title: "Low crowds", text: "Weekday sunrise had under 10 cars present.", risk: "low" },
+          { title: "Chains needed", text: "Carry tire chains—rangers check during snow.", risk: "medium" },
+        ],
+      },
     ],
   },
 ]
+
 
 const sentimentChip = (sentiment: NarrativeDetail["sentiment"]) => {
   if (sentiment === "positive") return "text-emerald-300 bg-emerald-400/10"
