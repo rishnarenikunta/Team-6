@@ -106,12 +106,14 @@ MONGODB_DB = os.getenv("MONGODB_DB", "travel_app")
 MONGODB_COLLECTION = os.getenv("MONGODB_COLLECTION", "videos")
 VIDEOS_COLLECTION = os.getenv("VIDEOS_COLLECTION", "videos")
 COMMENTS_COLLECTION = os.getenv("COMMENTS_COLLECTION", "comments")
+METADATA_COLLECTION = os.getenv("METADATA_COLLECTION", "metadata")
 
 mongo_client = MongoClient(MONGODB_URI) if MONGODB_URI else None
 db = mongo_client[MONGODB_DB] if mongo_client else None
 
 videos_col = db[VIDEOS_COLLECTION] if db is not None else None
 comments_col = db[COMMENTS_COLLECTION] if db is not None else None
+metadata_col = db[METADATA_COLLECTION] if db is not None else None
 
 @app.get("/")
 def home():
@@ -352,6 +354,25 @@ def to_iso_date(upload_date: str | None) -> str | None:
     except Exception:
         return None
 
+def save_metadata_to_mongo(metadata: dict):
+    if metadata_col is None:
+        raise HTTPException(status_code=500, detail="Mongo not configured. Set MONGODB_URI.")
+
+    video_id = metadata.get("video_id")
+    if not video_id:
+        raise HTTPException(status_code=500, detail="Missing video_id in metadata")
+
+    metadata_col.update_one(
+        {"_id": video_id},
+        {
+            "$set": {
+                **metadata,
+                "updated_at": datetime.now(timezone.utc),
+            }
+        },
+        upsert=True
+    )
+
 @app.get("/metadata/{video_id}")
 def get_metadata(video_id: str):
     url = f"https://www.youtube.com/watch?v={video_id}"
@@ -367,10 +388,9 @@ def get_metadata(video_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"yt-dlp metadata error: {str(e)}")
 
-    return {
+    metadata = {
         "video_id": info.get("id"),
         "title": info.get("title"),
-        "description": info.get("description"),
         "channel": {
             "name": info.get("uploader"),
             "id": info.get("uploader_id"),
@@ -389,6 +409,10 @@ def get_metadata(video_id: str):
         "categories": info.get("categories") or [],
         "language": info.get("language"),
     }
+
+    save_metadata_to_mongo(metadata)
+
+    return metadata
 
 @app.get("/top_videos/buckets")
 def top_20_videos_by_bucket_with_transcripts(
