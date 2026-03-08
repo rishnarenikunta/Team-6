@@ -4,9 +4,9 @@ import html
 import tempfile
 from fastapi import FastAPI, HTTPException
 import yt_dlp
-from datetime import datetime
+from datetime import datetime, timezone
 from dotenv import load_dotenv
-from pymongo import MongoClient
+from pymongo import MongoClient, UpdateOne
 import json
 from google.cloud import storage
 import subprocess
@@ -104,9 +104,14 @@ load_dotenv()
 MONGODB_URI = os.getenv("MONGODB_URI")
 MONGODB_DB = os.getenv("MONGODB_DB", "travel_app")
 MONGODB_COLLECTION = os.getenv("MONGODB_COLLECTION", "videos")
+VIDEOS_COLLECTION = os.getenv("VIDEOS_COLLECTION", "videos")
+COMMENTS_COLLECTION = os.getenv("COMMENTS_COLLECTION", "comments")
 
 mongo_client = MongoClient(MONGODB_URI) if MONGODB_URI else None
-videos_col = mongo_client[MONGODB_DB][MONGODB_COLLECTION] if mongo_client else None
+db = mongo_client[MONGODB_DB] if mongo_client else None
+
+videos_col = db[VIDEOS_COLLECTION] if db is not None else None
+comments_col = db[COMMENTS_COLLECTION] if db is not None else None
 
 @app.get("/")
 def home():
@@ -616,4 +621,54 @@ def fetch_comments(video_id: str, n: int = 10, timeout_sec: int = 60):
 def get_comments(video_id: str, n: int = 10, timeout_sec: int = 60):
     if n < 1 or n > 50:
         raise HTTPException(status_code=400, detail="n must be between 1 and 50")
-    return {"video_id": video_id, "sort": "top", "comments": fetch_comments(video_id, n=n, timeout_sec=timeout_sec)}
+    comments = fetch_comments(video_id, n=n, timeout_sec=timeout_sec)
+    save_comments_to_mongo(video_id, comments, sort="top")
+    return {
+        "video_id": video_id,
+        "sort": "top",
+        "comments": comments
+    }
+
+def save_comments_to_mongo(video_id: str, comments: list, sort: str = "top"):
+    if comments_col is None:
+        raise HTTPException(status_code=500, detail="Mongo not configured. Set MONGODB_URI.")
+
+    now = datetime.now(timezone.utc)
+    operations = []
+
+    for c in comments:
+        comment_id = c.get("id")
+        if not comment_id:
+            continue
+
+        mongo_id = f"{video_id}:{comment_id}"
+
+        doc = {
+            "_id": mongo_id,
+            "video_id": video_id,
+            "comment_id": comment_id,
+            "author": c.get("author"),
+            "text": c.get("text"),
+            "like_count": c.get("like_count") or 0,
+            "timestamp": c.get("timestamp"),
+            "parent": c.get("parent") or "root",
+            "updated_at": now,
+        }
+
+        operations.append(
+            UpdateOne(
+                {"_id": mongo_id},
+                {"$set": doc},
+                upsert=True
+            )
+        )
+
+    if operations:
+        result = comments_col.bulk_write(operations, ordered=False)
+        return {
+            "matched": result.matched_count,
+            "modified": result.modified_count,
+            "upserted": len(result.upserted_ids),
+        }
+
+    return {"matched": 0, "modified": 0, "upserted": 0}
