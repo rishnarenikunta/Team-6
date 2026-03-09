@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+youtube-transcript-api
+
+yt-dlp
+pymongo[srv]
+python-dotenv
+google-cloud-storage
