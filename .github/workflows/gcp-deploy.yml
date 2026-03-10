@@ -30,11 +30,10 @@ jobs:
     - name: Set up Cloud SDK
       uses: google-github-actions/setup-gcloud@v2
 
-    - name: Deploy to GCP
+    - name: Deploy to Cloud Run
       run: |
-        # Replace this with your specific deployment command
-        # Example for Cloud Run:
-        # gcloud run deploy my-service --source . --region us-central1
-        
-        echo "Authentication successful! Ready to run gcloud commands."
-        gcloud info
+        gcloud run deploy youtravel-llm \
+          --source . \
+          --region us-central1 \
+          --allow-unauthenticated \
+          --quiet
