@@ -1,0 +1,40 @@
+name: Deploy to Google Cloud
+
+# This section restricts the workflow to only run on specific branches
+on:
+  push:
+    branches:
+      - 'cloud/*'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    # These permissions are required for Workload Identity Federation to work
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Authenticate to Google Cloud
+      id: auth
+      uses: google-github-actions/auth@v2
+      with:
+        # You will get these values after setting up Step 1
+        workload_identity_provider: 'projects/528253522819/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider'
+        service_account: 'github-actions-sa@youtravel-487521.iam.gserviceaccount.com'
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+
+    - name: Deploy to GCP
+      run: |
+        # Replace this with your specific deployment command
+        # Example for Cloud Run:
+        # gcloud run deploy my-service --source . --region us-central1
+        
+        echo "Authentication successful! Ready to run gcloud commands."
+        gcloud info
