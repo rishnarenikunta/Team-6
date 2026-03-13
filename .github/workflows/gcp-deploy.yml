@@ -30,10 +30,10 @@ jobs:
     - name: Set up Cloud SDK
       uses: google-github-actions/setup-gcloud@v2
 
-    - name: Deploy to Cloud Run
+    - name: Deploy Cloud Run Job
       run: |
-        gcloud run deploy youtravel-llm \
+        gcloud run jobs deploy youtravel-llm-job \
           --source . \
           --region us-central1 \
-          --allow-unauthenticated \
+          --set-build-env-vars="GOOGLE_ENTRYPOINT=python DataCollectionTasks/monoprompt.py" \
           --quiet
