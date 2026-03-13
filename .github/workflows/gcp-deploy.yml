@@ -35,5 +35,4 @@ jobs:
         gcloud run jobs deploy youtravel-llm-job \
           --source . \
           --region us-central1 \
-          --set-build-env-vars="GOOGLE_ENTRYPOINT=python DataCollectionTasks/monoprompt.py" \
           --quiet
