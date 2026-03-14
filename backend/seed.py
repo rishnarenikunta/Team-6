@@ -28,16 +28,13 @@ narrative_validator = {
         "bsonType": "object",
         "properties": {
             "narrative_id":     {"bsonType": "string"},
-            "destination":      {"bsonType": "string"},
-            "country":          {"bsonType": "string"},
-            "signal_type":      {"enum": ["narrative_momentum", "search_interest", "watch_time"]},
-            "value":            {"bsonType": "double"},
-            "risk":             {"bsonType": "string"},
-            "highlights":       {"bsonType": "array"},
-            "blurb":            {"bsonType": "string"},
+            "video_id":         {"bsonType": "string"},
+            "date": {"bsonType": "date"},
+            "narrative_text":   {"bsonType": "string"},
             "narrative_vector": {"bsonType": "array", "items": {"bsonType": "double"}},
-            "refreshed_at":     {"bsonType": "date"},
-        },
+            "destination":      {"bsonType": "string"},   # ← add
+            "channel_id":       {"bsonType": "string"},   # ← add
+        }
     }
 }
 
@@ -47,10 +44,33 @@ claims_validator = {
         "properties": {
             "destination": {"bsonType": "string"},
             "claim_text":  {"bsonType": "string"},
+            "narrative_id": {"bsonType": "string"},
+            "video_id":     {"bsonType": "string"},
             "claim_vector":{"bsonType": "array", "items": {"bsonType": "double"}},
-            "source":      {"bsonType": "string"},
+            "channel_id":      {"bsonType": "string"},
             "claim_risk":  {"bsonType": "string"},
             "date":        {"bsonType": "string"},
+        },
+    }
+}
+
+video_validator = {
+    "$jsonSchema": {
+        "bsonType": "object",
+        "properties": {
+            "title":       {"bsonType": "string"},
+            "description": {"bsonType": "string"},
+            "duration":    {"bsonType": "int"},
+            "upload_date": {"bsonType": "date"},
+            "view_count":       {"bsonType": "int"},
+            "like_count":       {"bsonType": "int"},
+            "tags":         {"bsonType": "array", "items": {"bsonType": "string"}},
+            "language":     {"bsonType": "string"},
+            "comment_count":   {"bsonType": "int"},
+            "summary":         {"bsonType": "string"},
+            "overview": {"bsonType": "array", "items": {"bsonType": "double"}},
+            "sentiment": {"bsonType": "double"},
+            "comments": {"bsonType": "array", "items": {"bsonType": "string"}},
         },
     }
 }
@@ -73,6 +93,7 @@ for name, validator in [
     ("creators",   creator_validator),
     ("narratives", narrative_validator),
     ("claims",     claims_validator),
+    ("videos",     video_validator),
 ]:
     if name not in existing:
         db.create_collection(name, validator=validator)
@@ -140,41 +161,120 @@ lisbon_blurbs = [
 ]
 
 print("Embedding Kyoto narratives...")
+# Replace the kyoto_docs list comprehension:
 kyoto_docs = [
     {
-        "narrative_id": f"narr_kyoto_{i+1:02d}",
-        "destination": "Kyoto",
-        "country": "Japan",
-        "signal_type": "narrative_momentum",
-        "value": round(8.0 + (i % 5) * 0.8, 1),
-        "risk": "Low creator risk",
-        "highlights": ["culture", "food", "walkable"],
-        "blurb": blurb,
+        "narrative_id":     f"narr_kyoto_{i+1:02d}",
+        "video_id":         f"vid_kyoto_{i+1:02d}",
+        "narrative_text":   blurb,
         "narrative_vector": embed(blurb),
-        "refreshed_at": datetime.utcnow(),
+        "destination":      "Kyoto",           # ← add this
+        "channel_id":       "UC_mia_01",       # ← add this (or vary per doc if needed)
+        "date":             datetime.utcnow(),
     }
     for i, blurb in enumerate(kyoto_blurbs)
 ]
 
-print("Embedding Lisbon narratives...")
+# Same for lisbon_docs:
 lisbon_docs = [
     {
-        "narrative_id": f"narr_lisbon_{i+1:02d}",
-        "destination": "Lisbon",
-        "country": "Portugal",
-        "signal_type": "search_interest",
-        "value": round(6.0 + (i % 5) * 0.6, 1),
-        "risk": "Moderate creator risk",
-        "highlights": ["budget", "coast", "nightlife"],
-        "blurb": blurb,
+        "narrative_id":     f"narr_lisbon_{i+1:02d}",
+        "video_id":         f"vid_lisbon_{i+1:02d}",
+        "narrative_text":   blurb,
         "narrative_vector": embed(blurb),
-        "refreshed_at": datetime.utcnow(),
+        "destination":      "Lisbon",          # ← add this
+        "channel_id":       "UC_nina_01",      # ← add this
+        "date":             datetime.utcnow(),
     }
     for i, blurb in enumerate(lisbon_blurbs)
 ]
 
 db["narratives"].insert_many(kyoto_docs + lisbon_docs)
 print(f"✅ Inserted {len(kyoto_docs + lisbon_docs)} narratives with vectors")
+
+# ── Videos ───────────────────────────────────────────────────────────────
+
+video_docs = [
+    {
+        "title": "Kyoto Autumn Travel Guide",
+        "description": "Exploring Kyoto during peak autumn foliage with visits to temples, markets, and scenic walking paths.",
+        "duration": 720,
+        "upload_date": datetime(2024, 10, 10),
+        "view_count": 240000,
+        "like_count": 18000,
+        "tags": ["kyoto", "japan travel", "autumn leaves", "temples"],
+        "language": "en",
+        "comment_count": 540,
+        "summary": "A travel guide to Kyoto in autumn focusing on temples, food, and scenic walking routes.",
+        "overview": embed("Kyoto travel guide temples autumn food itinerary"),
+        "sentiment": 0.84,
+        "comments": [
+            "Kyoto looks incredible in autumn!",
+            "Adding this to my Japan itinerary.",
+            "The bamboo grove shot was amazing."
+        ],
+    },
+    {
+        "title": "Hidden Spots in Lisbon",
+        "description": "Exploring lesser-known neighborhoods and viewpoints in Lisbon including Mouraria and Principe Real.",
+        "duration": 650,
+        "upload_date": datetime(2024, 6, 2),
+        "view_count": 150000,
+        "like_count": 9200,
+        "tags": ["lisbon", "portugal travel", "hidden gems", "miradouros"],
+        "language": "en",
+        "comment_count": 310,
+        "summary": "A guide to hidden neighborhoods, viewpoints, and food spots across Lisbon.",
+        "overview": embed("Lisbon hidden gems viewpoints Alfama Mouraria travel"),
+        "sentiment": 0.79,
+        "comments": [
+            "Lisbon is my favorite city in Europe!",
+            "Those viewpoints are unreal.",
+            "Great tips for avoiding crowds."
+        ],
+    },
+    {
+        "title": "Tokyo Street Food Tour",
+        "description": "Trying street food across Tokyo including ramen shops, markets, and convenience store snacks.",
+        "duration": 840,
+        "upload_date": datetime(2024, 3, 14),
+        "view_count": 520000,
+        "like_count": 41000,
+        "tags": ["tokyo", "street food", "japan food", "ramen"],
+        "language": "en",
+        "comment_count": 1100,
+        "summary": "A street food tour through Tokyo featuring ramen, market stalls, and local snacks.",
+        "overview": embed("Tokyo street food ramen markets Japan travel food"),
+        "sentiment": 0.88,
+        "comments": [
+            "Now I'm craving ramen.",
+            "Tokyo food content never disappoints.",
+            "Convenience store food in Japan is elite."
+        ],
+    },
+    {
+        "title": "Seoul Nightlife Guide",
+        "description": "Experiencing Seoul nightlife in Hongdae and Myeongdong with street food and live performances.",
+        "duration": 700,
+        "upload_date": datetime(2024, 8, 18),
+        "view_count": 310000,
+        "like_count": 21000,
+        "tags": ["seoul", "korea travel", "nightlife", "street food"],
+        "language": "en",
+        "comment_count": 680,
+        "summary": "A nightlife guide exploring Seoul's food streets, music scene, and night markets.",
+        "overview": embed("Seoul nightlife Hongdae street food Korea travel guide"),
+        "sentiment": 0.82,
+        "comments": [
+            "Hongdae looks so fun!",
+            "Korean street food is unmatched.",
+            "Adding Seoul to my travel list."
+        ],
+    }
+]
+
+db["videos"].insert_many(video_docs)
+print(f"✅ Inserted {len(video_docs)} videos")
 
 # ── Claims (20 per creator, source = channel_id) ──────────────────────────────
 
@@ -278,12 +378,14 @@ for source, claim_list in [
     ("UC_nick_01", nick_claims),
     ("UC_nina_01", nina_claims),
 ]:
-    for dest, text in claim_list:
+    for idx, (dest, text) in enumerate(claim_list):
         all_claims.append({
             "destination": dest,
+            "narrative_id": f"narr_{dest.lower()}_{(idx % 20) + 1:02d}",
+            "video_id": f"vid_{source}_{idx:02d}",
             "claim_text": text,
-            "source": source,
             "claim_vector": embed(text),
+            "source": source,
             "claim_risk": "Low",
             "date": "2024-01-15",
         })

@@ -9,12 +9,12 @@ import "./ClaimsCarousel.css";
 interface Claim {
   id: string;
   text: string;
-  source: string;
-  views: string;
-  engagement: string;
-  growth: string;
   destination: string;
-  verified: boolean;
+  cluster_size: number;
+  computed_at: string | null;
+  source: string;        // channel_id
+  creator_name: string;
+  views: number;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -32,13 +32,8 @@ export default function ClaimsCarousel() {
       try {
         const res = await fetch(`${API_BASE}/api/claims/trending`);
         if (!res.ok) throw new Error(`API error ${res.status}`);
-    
         const data = await res.json();
-    
-        console.log("RAW API RESPONSE:", data);   // 👈 add this
-        console.log("First claim:", data[0]);     // 👈 useful
-    
-        setClaims(data);
+        setClaims(data.claims);
       } catch (err) {
         console.error("Fetch error:", err);
         setError("Could not load claims.");
@@ -92,16 +87,15 @@ export default function ClaimsCarousel() {
             whileHover={{ scale: 1.05, y: -8 }}
             transition={{ type: "spring", stiffness: 200, damping: 15 }}
           >
-            <h3 className="card-title">Claim:</h3>
-
-            <p className="card-quote">"{claim.text}"</p>
-
-            <div className="card-meta">
-              <p>Source: {claim.source}</p>
-              <p>Views: {claim.views}</p>
-              <p>Engagement Rate: {claim.engagement}</p>
-              <p>Growth Velocity: {claim.growth}</p>
-            </div>
+            <h3 className="card-title">{claim.destination}</h3>
+<p className="card-quote">"{claim.text}"</p>
+<div className="card-meta">
+  <p>{claim.creator_name} · {claim.views.toLocaleString()} views</p>
+  <p>Based on {claim.cluster_size} similar claims</p>
+  {claim.computed_at && (
+    <p>Updated: {new Date(claim.computed_at).toLocaleDateString()}</p>
+  )}
+</div>
           </motion.div>
         ))}
       </motion.div>
