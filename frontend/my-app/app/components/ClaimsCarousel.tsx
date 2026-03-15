@@ -1,4 +1,4 @@
-"use client";
+"use client"
 
 import { motion } from "framer-motion";
 import { useRef, useEffect, useState } from "react";
@@ -77,10 +77,12 @@ export default function ClaimsCarousel() {
 
   // ── Cards ───────────────────────────────────────────────────────────────────
   return (
-    <div className="carousel-wrapper">
+    <div
+      ref={carouselRef}
+      className="w-full overflow-x-auto no-scrollbar pb-4 snap-x snap-mandatory"
+    >
       <motion.div
-        ref={carouselRef}
-        className="carousel-track"
+        className="flex min-w-max gap-5 px-1 cursor-grab"
         drag="x"
         dragConstraints={carouselRef}
         dragElastic={0.08}
@@ -92,11 +94,11 @@ export default function ClaimsCarousel() {
             whileHover={{ scale: 1.05, y: -8 }}
             transition={{ type: "spring", stiffness: 200, damping: 15 }}
           >
-            <h3 className="card-title">Claim:</h3>
+            <h3 className="text-sm font-semibold text-gray-100 mb-3">Claim:</h3>
 
-            <p className="card-quote">"{claim.text}"</p>
+            <p className="text-lg font-medium text-purple-200 mb-4 leading-snug">“{claim.text}”</p>
 
-            <div className="card-meta">
+            <div className="space-y-1 text-sm text-gray-200">
               <p>Source: {claim.source}</p>
               <p>Views: {claim.views}</p>
               <p>Engagement Rate: {claim.engagement}</p>
@@ -106,5 +108,5 @@ export default function ClaimsCarousel() {
         ))}
       </motion.div>
     </div>
-  );
+  )
 }

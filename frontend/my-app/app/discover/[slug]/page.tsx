@@ -140,8 +140,8 @@ export default async function DestinationPage({ params }: Params) {
     <div className="min-h-screen bg-gradient-to-b from-[#0b0b10] via-[#0f1018] to-[#0b0b10] text-white">
       <div className="max-w-6xl mx-auto px-6 pb-16 pt-12 space-y-10">
         <div className="flex items-center gap-4 text-sm text-gray-400">
-          <Link href="/discover" className="underline underline-offset-4 decoration-white/30 hover:text-white">
-            Discover
+          <Link href="/" className="underline underline-offset-4 decoration-white/30 hover:text-white">
+            Dashboard
           </Link>
           <span>›</span>
           <span className="text-gray-200">{destination.name}</span>

@@ -21,8 +21,8 @@ export default function NewDashboard() {
       <div className="max-w-6xl mx-auto px-6 pb-16 pt-12 space-y-10">
         <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div className="space-y-3">
-            <p className="text-xs uppercase tracking-[0.3em] text-gray-400">Welcome to YouTravel</p>
-            <h1 className="text-4xl font-semibold leading-tight">Dashboard</h1>
+            <p className="text-xs uppercase tracking-[0.3em] text-gray-400">Dashboard</p>
+            <h1 className="text-4xl font-semibold leading-tight">YouTravel</h1>
             <p className="text-sm text-gray-400 max-w-2xl">
               Combine creator sentiment, trend velocity, and safety signals before you book. Start with a search or
               pick a quick filter to explore narratives already emerging on YouTube.
@@ -35,7 +35,7 @@ export default function NewDashboard() {
                 <label className="sr-only" htmlFor="discover-search">
                     Search destinations
                 </label>
-                <div className="relative flex gap-2 bg-[#16161e] border border-[#242436] rounded-2xl px-4 py-3 shadow-lg shadow-black/40">
+                <div className="relative flex gap-2 bg-[#16161e] border border-[#242436] rounded-2xl px-4 py-2 shadow-lg shadow-black/40">
                     <input
                         id="discover-search"
                         type="search"
@@ -66,7 +66,8 @@ export default function NewDashboard() {
             <StatsMain />
             <TrendingNarratives />
             <TopCountries />
-            
+            <TrendingLocations />
+            <TrendingClaims />
     
         </section>
       </div>

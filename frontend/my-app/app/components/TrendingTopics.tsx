@@ -22,8 +22,9 @@ export default function TrendingTopics() {
   }, [])
 
   return (
-    <div className="w-full px-8 py-8">
-      <h2 className="text-2xl font-semibold text-white mb-6 tracking-tight">
+    <div className="w-full pt-3 text-foreground space-y-3">
+      {/* Section Title */}
+      <h2 className="text-sm font-semibold text-gray-300">
         Trending Topics
       </h2>
 

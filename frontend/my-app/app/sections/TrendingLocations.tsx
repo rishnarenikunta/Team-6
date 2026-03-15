@@ -25,7 +25,7 @@ export default function TrendingLocations() {
 
   return (
     <div className="w-full h-dvh pt-8 px-8">
-    <h2 className="text-3xl font-semibold text-white tracking-tight mb-2">
+    <h2 className="text-2xl font-semibold text-white tracking-tight mb-2">
         Destination Trend Graph
       </h2>
       <p className="text-sm text-neutral-400 border-b border-neutral-800 pb-4 mb-4">Narratives represent AI-clustered story themes emerging across travel videos.</p>

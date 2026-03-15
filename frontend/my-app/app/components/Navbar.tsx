@@ -4,10 +4,10 @@ import Link from "next/link"
 
 export default function Navbar() {
   return (
-    <aside className="h-full w-full bg-gradient-to-b from-[#16121a] via-[#0e0e16] to-[#0a0a12] border-r border-white/10 shadow-2xl shadow-black/40 px-6 py-8 flex flex-col gap-8">
+    <aside className="h-full w-full shrink-0 bg-gradient-to-b from-[#16121a] via-[#0e0e16] to-[#0a0a12] border-r border-white/10 shadow-2xl shadow-black/40 px-6 py-8 flex flex-col gap-8">
       <div className="space-y-2">
-        <p className="text-xs uppercase tracking-[0.3em] text-gray-500">YouTravel</p>
-        <h1 className="text-2xl font-semibold text-white">Travel Intelligence</h1>
+        <p className="text-xs uppercase tracking-[0.3em] text-gray-500">your ultimate travel guide</p>
+        <h1 className="text-2xl font-semibold text-white">YouTravel</h1>
         <p className="text-sm text-gray-500">
           Monitor narratives, detect trends, evaluate creator risk in real time.
         </p>
@@ -15,7 +15,7 @@ export default function Navbar() {
 
       <nav className="flex flex-col gap-3 text-sm font-medium text-gray-200">
         <NavLink href="/" label="Dashboard" />
-        <NavLink href="/discover" label="Discover" />
+        {/* <NavLink href="/discover" label="Discover" /> */}
         <NavLink href="/narratives" label="Narratives" />
         <NavLink href="/creators" label="Creators" />
         <NavLink href="/settings" label="Settings" />

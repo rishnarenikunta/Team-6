@@ -59,6 +59,15 @@ const destinations = [
 
 const TopCountries = () => {
     return (
+        <div className="w-full mt-10 h-fit">
+          <h2 className="text-2xl font-semibold text-white tracking-tight mb-2">
+            Trending Countries
+          </h2>
+          <p className="text-sm text-neutral-400 border-b border-neutral-800 pb-4 mb-4">
+            Trending countries represent top travel destinations gaining momentum across creator content and audience engagement.
+            </p>
+
+
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {destinations.map((city) => (
                 <Link
@@ -101,6 +110,7 @@ const TopCountries = () => {
                 </div>
                 </Link>
             ))}
+            </div>
             </div>
     );
 };
