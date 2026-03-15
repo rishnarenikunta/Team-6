@@ -235,7 +235,7 @@ def _insert_cookies_flag(cmd: list[str], cookies_path: Optional[str]) -> list[st
     return cmd
 
 
-def _run(cmd: list[str], timeout: int = 600) -> None:
+def _run(cmd: list[str], timeout: int = 1200) -> None:
     proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
     if proc.returncode != 0:
         err = (proc.stderr or proc.stdout or "").strip()
@@ -255,7 +255,7 @@ def _reencode_to_mp3(src_path: str, dst_path: str) -> None:
     _run(cmd, timeout=1200)
 
 
-def _split_mp3(mp3_path: str, out_dir: str, segment_seconds: int = 600) -> list[str]:
+def _split_mp3(mp3_path: str, out_dir: str, segment_seconds: int = 1200) -> list[str]:
     out_pattern = os.path.join(out_dir, "chunk_%03d.mp3")
     cmd = [
         FFMPEG, "-y",
@@ -762,7 +762,10 @@ def top_20_videos_by_bucket_store(
                     continue
 
                 if bucket in NON_TRAVEL_BUCKETS:
-                    fake_info = {"title": info.get("title"), "description": info.get("description")}
+                    fake_info = {
+                        "title": info.get("title"),
+                        "description": info.get("description")
+                    }
                     if not is_travel_video(fake_info):
                         continue
 
@@ -797,25 +800,19 @@ def top_20_videos_by_bucket_store(
                 vid = v["video_id"]
                 print(f"[STORE {idx}/{len(top20)}] {vid}")
 
-                transcript_text = fetch_transcript_text(vid)
-
+                transcript_payload = None
                 transcript_path = None
-                if transcript_text:
-                    print(f"[TRANSCRIPT READY] {vid} chars={len(transcript_text)}")
-                    transcript_path = upload_transcript_to_gcs(vid, transcript_text)
-                    print(f"[UPLOAD TRANSCRIPT OK] {vid}")
-                else:
-                    print(f"[UPLOAD TRANSCRIPT SKIP] {vid} (no transcript)")
-
                 top_comments = []
+
                 try:
-                    top_comments = fetch_comments(vid, n=10, timeout_sec=180)
-                    print(f"[COMMENTS OK] {vid} n={len(top_comments)}")
-                    save_comments_to_mongo(vid, top_comments)
-                    print(f"[MONGO COMMENTS OK] {vid}")
+                    transcript_payload = get_transcript(vid)
+                    transcript_path = transcript_payload.get("gcs_transcript_path")
+                    top_comments = transcript_payload.get("top_comments", [])
+                    print(f"[GET_TRANSCRIPT OK] {vid}")
+                except HTTPException as e:
+                    print(f"[GET_TRANSCRIPT FAIL] {vid} status={e.status_code} detail={e.detail}")
                 except Exception as e:
-                    print(f"[COMMENTS FAIL] {vid} err={str(e)[:200]}")
-                    top_comments = []
+                    print(f"[GET_TRANSCRIPT FAIL] {vid} err={str(e)[:200]}")
 
                 metadata = {
                     "video_id": vid,
@@ -831,8 +828,11 @@ def top_20_videos_by_bucket_store(
                     "gcs_transcript_path": transcript_path,
                 }
 
-                save_metadata_to_mongo(metadata)
-                print(f"[MONGO METADATA OK] {vid}")
+                try:
+                    save_metadata_to_mongo(metadata)
+                    print(f"[MONGO METADATA OK] {vid}")
+                except Exception as e:
+                    print(f"[MONGO METADATA FAIL] {vid} err={str(e)[:200]}")
 
                 stored.append({
                     **v,
