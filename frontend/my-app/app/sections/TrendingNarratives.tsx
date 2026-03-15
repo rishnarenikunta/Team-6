@@ -37,14 +37,11 @@ export default function TrendingNarratives() {
   }, []);
 
   return (
-    <div className="w-full h-dvh p-8 mt-6">
-      <h2 className="text-3xl font-semibold text-white tracking-tight mb-2">
+    <div className="w-full mt-10 h-fit mb-50">
+      <h2 className="text-2xl font-semibold text-white tracking-tight mb-2">
         Trending Narratives
       </h2>
-      <p className="text-sm text-neutral-400 border-b border-neutral-800 pb-4 mb-4">
-        Narratives represent AI-clustered story themes emerging across travel videos.
-      </p>
-
+      <p className="text-sm text-neutral-400 border-b border-neutral-800 pb-4 mb-4">Narratives represent AI-clustered story themes emerging across travel videos.</p>
       <div className="relative flex gap-16 text-white">
 
         {/* LEFT SIDE LIST */}

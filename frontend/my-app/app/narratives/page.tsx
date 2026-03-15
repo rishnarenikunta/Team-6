@@ -96,7 +96,7 @@ const sentimentChip = (sentiment: Narrative["sentiment"]) => {
 
 export default function NarrativePage() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#0c0c12] via-[#0f1018] to-[#0c0c12] text-white">
+    <div className="min-h-screen bg-gradient-to-b from-[#0c0c12] via-[#130f18] to-[#0c0c12] text-white">
       <div className="max-w-6xl mx-auto px-6 pb-16 pt-12 space-y-10">
         <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div className="space-y-3">
@@ -142,12 +142,12 @@ export default function NarrativePage() {
           <div className="grid gap-4 md:grid-cols-2">
             {narratives.map((narrative) => (
               <Link key={narrative.title} href={`/narratives/${narrative.slug}`} className="block group">
-                <article className="relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-[#151525] via-[#10101a] to-[#0c0c12] p-5 transition hover:-translate-y-1 hover:border-white/25 hover:shadow-2xl hover:shadow-black/50">
+                <article className="relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-[#1d1525] via-[#10101a] to-[#0c0c12] p-5 transition hover:-translate-y-1 hover:border-white/25 hover:shadow-2xl hover:shadow-black/50">
                   <div className="flex items-start justify-between gap-3">
                     <div className="space-y-1">
                       <h3 className="text-xl font-semibold group-hover:text-white">{narrative.title}</h3>
                       <p className="text-sm text-gray-400">{narrative.region}</p>
-                    </div>
+                    </div>  
                     <span className={`rounded-full px-3 py-1 text-xs ${sentimentChip(narrative.sentiment)}`}>
                       {narrative.sentiment}
                     </span>

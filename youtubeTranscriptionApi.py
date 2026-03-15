@@ -594,6 +594,104 @@ def fetch_video_info(video_id: str) -> dict:
     }
 
 
+BUCKET_NAME = "youtravel_transcripts"
+storage_client = storage.Client()
+
+TRAVEL_KEYWORDS = [
+    "travel", "trip", "tour", "itinerary", "vacation",
+    "explore", "exploring",
+    "city", "country", "island", "beach", "mountain",
+    "airport", "flight", "train",
+    "hotel", "hostel",
+    "vlog"
+]
+
+def is_travel_video(info: dict) -> bool:
+    text = (
+        (info.get("title") or "") + " " +
+        (info.get("description") or "")
+    ).lower()
+
+    for word in TRAVEL_KEYWORDS:
+        if word in text:
+            return True
+
+    return False
+
+
+CHANNEL_BUCKETS: dict[str, list[str]] = {
+    "Travel": [
+        "https://www.youtube.com/@fearlessandfar/videos",
+        "https://www.youtube.com/@drewbinsky/videos",
+    ],
+    "Food": [
+        "https://www.youtube.com/@FoodNetwork/videos",
+        "https://www.youtube.com/@buzzfeedtasty/videos",
+    ],
+    "Lifestyle/Vlog": [
+        "https://www.youtube.com/@emmachamberlain/videos",
+        "https://www.youtube.com/@casey/videos",
+    ],
+    "Wellness": [
+        "https://www.youtube.com/@bohobeautiful/videos",
+        "https://www.youtube.com/@WildWeRoam/videos",
+    ],
+    "Tech": [
+        "https://www.youtube.com/@iJustine/videos",
+        "https://www.youtube.com/@OneTechTraveller/videos",
+    ],
+    "Entertainment": [
+        "https://www.youtube.com/@Vogue/videos",
+        "https://www.youtube.com/@ELLE/videos",
+    ],
+    "News": [
+        "https://www.youtube.com/@NBCNews/videos",
+        "https://www.youtube.com/@CNN/videos",
+    ],
+}
+
+NON_TRAVEL_BUCKETS = {"Food", "Lifestyle/Vlog", "Tech", "Entertainment", "News", "Wellness"}
+
+DEFAULT_WEIGHTS = {
+    "views": 0.34,
+    "likes": 0.33,
+    "comments": 0.33,
+}
+
+def upload_transcript_to_gcs(video_id: str, transcript_text: str) -> str:
+    bucket = storage_client.bucket(BUCKET_NAME)
+
+    blob_path = f"transcripts/{video_id}.json"
+    blob = bucket.blob(blob_path)
+
+    payload = {
+        "video_id": video_id,
+        "text": transcript_text,
+    }
+
+    blob.upload_from_string(
+        json.dumps(payload, ensure_ascii=False),
+        content_type="application/json",
+    )
+
+    return f"gs://{BUCKET_NAME}/{blob_path}"
+
+load_dotenv()
+
+MONGODB_URI = os.getenv("MONGODB_URI")
+MONGODB_DB = os.getenv("MONGODB_DB", "travel_app")
+MONGODB_COLLECTION = os.getenv("MONGODB_COLLECTION", "videos")
+VIDEOS_COLLECTION = os.getenv("VIDEOS_COLLECTION", "videos")
+COMMENTS_COLLECTION = os.getenv("COMMENTS_COLLECTION", "comments")
+METADATA_COLLECTION = os.getenv("METADATA_COLLECTION", "metadata")
+
+mongo_client = MongoClient(MONGODB_URI) if MONGODB_URI else None
+db = mongo_client[MONGODB_DB] if mongo_client else None
+
+videos_col = db[VIDEOS_COLLECTION] if db is not None else None
+comments_col = db[COMMENTS_COLLECTION] if db is not None else None
+metadata_col = db[METADATA_COLLECTION] if db is not None else None
+
 @app.get("/")
 def home():
     return {
@@ -658,6 +756,59 @@ def get_transcript(video_id: str):
     save_metadata_to_mongo(metadata)
     print(f"[MONGO METADATA OK] {video_id}")
 
+    cmd = [
+        "yt-dlp",
+        "--ignore-config",
+        "--skip-download",
+        "--get-comments",
+        "--extractor-args", "youtube:comment_sort=top",  #top comments
+        "--dump-single-json",
+        url,
+    ]
+
+    if cookies and os.path.exists(cookies):
+        cmd[1:1] = ["--cookies", cookies]
+
+    try:
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=timeout_sec,
+        )
+    except subprocess.TimeoutExpired:
+        raise HTTPException(status_code=504, detail=f"Timed out fetching comments after {timeout_sec}s")
+
+    if proc.returncode != 0:
+        raise HTTPException(
+            status_code=500,
+            detail=f"yt-dlp comments error: {proc.stderr.strip() or proc.stdout.strip()}",
+        )
+
+    data = json.loads(proc.stdout)
+    comments = data.get("comments") or []
+
+    comments.sort(key=lambda c: (c.get("like_count") or 0), reverse=True)
+
+    top = []
+    for c in comments[:n]:
+        top.append({
+            "id": c.get("id"),
+            "author": c.get("author"),
+            "text": c.get("text") or c.get("content"),
+            "like_count": c.get("like_count"),
+            "timestamp": c.get("timestamp"),
+            "parent": c.get("parent"),
+        })
+
+    return top
+
+@app.get("/comments/{video_id}")
+def get_comments(video_id: str, n: int = 10, timeout_sec: int = 60):
+    if n < 1 or n > 50:
+        raise HTTPException(status_code=400, detail="n must be between 1 and 50")
+    comments = fetch_comments(video_id, n=n, timeout_sec=timeout_sec)
+    save_comments_to_mongo(video_id, comments, sort="top")
     return {
         "video_id": video_id,
         "gcs_transcript_path": transcript_path,
@@ -864,3 +1015,47 @@ def transcribe_youtube(req: YouTubeRequest):
         "gcs_transcript_path": transcript_path,
         "text": text
     }
+
+def save_comments_to_mongo(video_id: str, comments: list, sort: str = "top"):
+    if comments_col is None:
+        raise HTTPException(status_code=500, detail="Mongo not configured. Set MONGODB_URI.")
+
+    now = datetime.now(timezone.utc)
+    operations = []
+
+    for c in comments:
+        comment_id = c.get("id")
+        if not comment_id:
+            continue
+
+        mongo_id = f"{video_id}:{comment_id}"
+
+        doc = {
+            "_id": mongo_id,
+            "video_id": video_id,
+            "comment_id": comment_id,
+            "author": c.get("author"),
+            "text": c.get("text"),
+            "like_count": c.get("like_count") or 0,
+            "timestamp": c.get("timestamp"),
+            "parent": c.get("parent") or "root",
+            "updated_at": now,
+        }
+
+        operations.append(
+            UpdateOne(
+                {"_id": mongo_id},
+                {"$set": doc},
+                upsert=True
+            )
+        )
+
+    if operations:
+        result = comments_col.bulk_write(operations, ordered=False)
+        return {
+            "matched": result.matched_count,
+            "modified": result.modified_count,
+            "upserted": len(result.upserted_ids),
+        }
+
+    return {"matched": 0, "modified": 0, "upserted": 0}

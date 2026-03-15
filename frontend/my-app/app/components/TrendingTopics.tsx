@@ -23,8 +23,9 @@ export default function TrendingTopics() {
   }, [])
 
   return (
-    <div className="w-full px-8 py-8">
-      <h2 className="text-2xl font-semibold text-white mb-6 tracking-tight">
+    <div className="w-full pt-3 text-foreground space-y-3">
+      {/* Section Title */}
+      <h2 className="text-sm font-semibold text-gray-300">
         Trending Topics
       </h2>
 
@@ -32,18 +33,21 @@ export default function TrendingTopics() {
         {topics.map((topic) => (
           <button
             key={topic}
-            onClick={() => router.push(`/discover?q=${topic}`)}
+            onClick={() => router.push(`/discover/${topic}`)}
             className="
-              flex-shrink-0
-              px-5 py-2
-              text-sm font-medium
-              text-gray-300
-              border border-neutral-800
               rounded-full
-              hover:border-neutral-600
-              hover:text-white
-              hover:shadow-[0_0_12px_rgba(255,255,255,0.05)]
-              transition-all duration-200
+              border 
+              border-white/10 
+              bg-white/5 
+              px-4 
+              py-2 
+              text-xs 
+              text-gray-200 
+              transition 
+              hover:-translate-y-0.5 
+              hover:border-white/25 
+              hover:bg-[#E4CAFF] 
+              hover:text-[#1c1b22]
             "
           >
             {topic}

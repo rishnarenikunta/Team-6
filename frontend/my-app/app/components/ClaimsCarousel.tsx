@@ -1,8 +1,8 @@
-"use client";
+"use client"
 
 import { motion } from "framer-motion";
 import { useRef, useEffect, useState } from "react";
-import "./ClaimsCarousel.css";
+// import "./ClaimsCarousel.css";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -72,10 +72,12 @@ export default function ClaimsCarousel() {
 
   // ── Cards ───────────────────────────────────────────────────────────────────
   return (
-    <div className="carousel-wrapper">
+    <div
+      ref={carouselRef}
+      className="w-full overflow-x-auto no-scrollbar pb-4 snap-x snap-mandatory"
+    >
       <motion.div
-        ref={carouselRef}
-        className="carousel-track"
+        className="flex min-w-max gap-5 px-1 cursor-grab"
         drag="x"
         dragConstraints={carouselRef}
         dragElastic={0.08}
@@ -100,5 +102,5 @@ export default function ClaimsCarousel() {
         ))}
       </motion.div>
     </div>
-  );
+  )
 }
