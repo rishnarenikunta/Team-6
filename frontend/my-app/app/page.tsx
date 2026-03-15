@@ -5,7 +5,7 @@ import TrendingTopics from "./components/TrendingTopics";
 import StatsMain from "./sections/StatsMain";
 import TrendingNarratives from "./sections/TrendingNarratives";
 import TrendingLocations from "./sections/TrendingLocations";
-import ClaimCarousel from "./components/ClaimsCarousel";
+import { TrendingClaims } from "./sections/TrendingClaims";
 
 export default function Home() {
   return (
@@ -15,7 +15,7 @@ export default function Home() {
       <StatsMain />
       <TrendingNarratives />
       <TrendingLocations />
-      <ClaimCarousel />
+      <TrendingClaims />
     </div>
   );
 }

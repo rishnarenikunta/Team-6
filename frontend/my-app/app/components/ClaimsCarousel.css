@@ -5,8 +5,7 @@
 .carousel-wrapper {
   overflow-x: auto;
   overflow-y: hidden;
-  padding: 3rem 2rem;
-  background: #000;
+  padding: 1rem 1rem;
 
   /* Smooth scrolling */
   scroll-behavior: smooth;
@@ -58,8 +57,8 @@
 /* ===================== */
 
 .carousel-card {
-  min-width: 320px;
-  max-width: 320px;
+  min-width: 250px;
+  max-width: 200px;
   height: 260px;
 
   background: linear-gradient(135deg, #4b4453, #3b3540);
@@ -73,9 +72,6 @@
   transition: box-shadow 0.3s ease;
 }
 
-.carousel-card:hover {
-  box-shadow: 0 12px 35px rgba(167, 139, 250, 0.5);
-}
 
 .card-title {
   font-weight: 600;

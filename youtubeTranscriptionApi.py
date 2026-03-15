@@ -569,16 +569,7 @@ def fetch_comments(video_id: str, n: int = 10, timeout_sec: int = 180):
     comments = data.get("comments") or []
     comments.sort(key=lambda c: (c.get("like_count") or 0), reverse=True)
 
-    top = []
-    for c in comments[:n]:
-        top.append({
-            "id": c.get("id"),
-            "author": c.get("author"),
-            "text": c.get("text") or c.get("content"),
-            "like_count": c.get("like_count"),
-            "timestamp": c.get("timestamp"),
-            "parent": c.get("parent"),
-        })
+    text = "\n".join(s.text for s in fetched)
 
     return top
 
