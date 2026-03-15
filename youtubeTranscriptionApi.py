@@ -255,7 +255,7 @@ def _reencode_to_mp3(src_path: str, dst_path: str) -> None:
     _run(cmd, timeout=1200)
 
 
-def _split_mp3(mp3_path: str, out_dir: str, segment_seconds: int = 1200) -> list[str]:
+def _split_mp3(mp3_path: str, out_dir: str, segment_seconds: int = 1000) -> list[str]:
     out_pattern = os.path.join(out_dir, "chunk_%03d.mp3")
     cmd = [
         FFMPEG, "-y",
