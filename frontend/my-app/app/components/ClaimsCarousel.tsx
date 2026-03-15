@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { useRef, useEffect, useState } from "react";
-import "./ClaimsCarousel.css";
+// import "./ClaimsCarousel.css";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
