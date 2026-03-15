@@ -33,19 +33,22 @@ TRANSCRIPT_BASE_URL = "http://localhost:8000"  # adjust if different host/port
 
 
 def fetch_transcript_from_api(video_id: str) -> str:
-    """
-    Calls your FastAPI service:
-      GET /transcript/{video_id}
-    and returns the 'text' field.
-    """
     url = f"{TRANSCRIPT_BASE_URL}/transcript/{video_id}"
-    resp = requests.get(url)
-    if resp.status_code == 404:
-        # Transcript not available
+    try:
+        resp = requests.get(url, timeout=30)
+        if resp.status_code == 404:
+            return ""
+        resp.raise_for_status()
+        return resp.json().get("text", "")
+    except requests.exceptions.ConnectionError:
+        print(f"[WARN] Transcript service unavailable for {video_id}, proceeding without transcript")
         return ""
-    resp.raise_for_status()
-    data = resp.json()
-    return data.get("text", "")
+    except requests.exceptions.Timeout:
+        print(f"[WARN] Transcript service timed out for {video_id}")
+        return ""
+    except Exception as e:
+        print(f"[WARN] Transcript fetch failed for {video_id}: {e}")
+        return ""
 
 
 def build_country_features(
@@ -85,7 +88,7 @@ class Narrative(BaseModel):
     claims: list[Claim]
 
 class CommentAnalysis(BaseModel):
-    overall_sentiment: str
+    overall_sentiment: float
     general_risk_callouts: list[str]
 
 class VideoComponents(BaseModel):
@@ -146,7 +149,9 @@ def extract_video_features_for_video(
         "1. Video Summary: Provide a concise, 1-2 sentence summary of what the video is about."
         # "2. Video Overview: Provide a broader contextual paragraph detailing the video's purpose, tone, and main message based on the metadata and transcript."
         "2. Destinations: Extract the primary physical countries discussed or visited in the video. Only include those that are a central topic or destination in the video."
-        "3. Overall Comment Analysis: Analyze the comments to determine the overall sentiment and identify any general risk callouts (e.g., hate speech, spam, widespread misinformation, dangerous acts)."
+        "3. Overall Comment Analysis: Analyze the comments to determine the overall sentiment "
+        "as a score from 0.0 to 1.0 (0.0 = very negative, 0.5 = neutral, 1.0 = very positive). "
+        "Also identify any general risk callouts (e.g., hate speech, spam, widespread misinformation, dangerous acts)."
         "4. Narratives & Claims: Break down the transcript into its overarching themes or opinions about the location (Narratives). Under each Narrative, list the specific reasons or features the speaker highlights to prove that point (Claims)."
         "\n(a) CRITICAL INSTRUCTIONS: DO NOT summarize the plot or recount what the speaker did chronologically (e.g., avoid 'They went to the museum and then ate dinner')."
         "\n(b) DO extract qualitative judgments and actionable insights (e.g., 'The local food scene is highly accessible for vegans,' supported by claims like 'Every restaurant had plant-based menus')."
