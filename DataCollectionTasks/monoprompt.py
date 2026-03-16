@@ -15,11 +15,15 @@ import numpy as np  # currently unused, but imported for later work
 
 import json
 import requests
+import uuid
+from datetime import datetime, timezone
 
 from google.cloud import storage
+from pymongo import MongoClient
 
 load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+MONGODB_URI = os.getenv("MONGODB_URI")
 
 client = genai.Client(
     api_key=GEMINI_API_KEY,
@@ -360,6 +364,119 @@ def classify_is_travel_video(
     # Fallback: treat unclear answers as Non-Travel
     return False
 
+def _present(d: dict) -> dict:
+    """Strip None values so we never overwrite existing fields with nulls."""
+    return {k: v for k, v in d.items() if v is not None}
+
+def save_features_to_collections(db, ctx: dict, features: Dict[str, Any]) -> tuple[list, list]:
+    """
+    Routes the extracted Gemini features to the correct MongoDB collections.
+    videos      ← top-level video fields + summary + sentiment
+    creators    ← stub upsert (preserves existing data)
+    narratives  ← one doc per narrative (with embedding)
+    claims      ← one doc per claim    (with embedding)
+    """
+    videos_col = db["videos"]
+    creators_col = db["creators"]
+    narratives_col = db["narratives"]
+    claims_col = db["claims"]
+
+    now = datetime.now(timezone.utc)
+    now_str = now.isoformat()
+    vc = features.get("video_components") or {}
+
+    video_id = ctx.get("video_id")
+    channel_id = ctx.get("channel_id")
+
+    # 1. Update Videos Collection
+    comment_analysis = vc.get("overall_comment_analysis") or {}
+    videos_col.update_one(
+        {"video_id": video_id},
+        {"$set": _present({
+            "video_id":      video_id,
+            "title":         ctx.get("title"),
+            "description":   ctx.get("description"),
+            "tags":          ctx.get("tags"),
+            "comments":      ctx.get("top_comments"),
+            "summary":       vc.get("video_summary"),
+            "destinations":  vc.get("video_topics_destinations"),
+            "sentiment":     comment_analysis.get("overall_sentiment"),
+            "risk_callouts": comment_analysis.get("general_risk_callouts"),
+            "is_travel":     True,
+            "updated_at":    now,
+        })},
+        upsert=True,
+    )
+
+    # 2. Update Creators Collection (stub)
+    if channel_id:
+        creators_col.update_one(
+            {"channel_id": channel_id},
+            {"$setOnInsert": _present({
+                "channel_id":    channel_id,
+                "name":          ctx.get("channel_title"),
+                "created_at":    now,
+            })},
+            upsert=True,
+        )
+
+    narrative_ids: List[str] = []
+    claim_ids: List[str] = []
+
+    destinations = vc.get("video_topics_destinations") or []
+    primary_destination = destinations[0] if destinations else None
+
+    # 3. Insert Narratives and Claims
+    for narrative in (vc.get("narratives") or []):
+        if not narrative:
+            continue
+
+        narrative_id = str(uuid.uuid4())
+        narrative_ids.append(narrative_id)
+
+        narratives_col.insert_one(_present({
+            "narrative_id":     narrative_id,
+            "video_id":         video_id,
+            "channel_id":       channel_id,
+            "narrative_title":  narrative.get("narrative_title"),
+            "narrative_text":   narrative.get("narrative_description"),
+            "narrative_vector": narrative.get("narrative_title_embedding"),
+            "comment_summary":  narrative.get("narrative_comment_summary"),
+            "risk": _present({
+                "sentiment": narrative.get("narrative_comment_risk"),
+                "risk_text":  narrative.get("narrative_comment_risk"),
+            }) or None,
+            "destination":      primary_destination,
+            "date":             now,
+        }))
+
+        for claim in (narrative.get("claims") or []):
+            if not claim:
+                continue
+
+            claim_id = str(uuid.uuid4())
+            claim_ids.append(claim_id)
+
+            claims_col.insert_one(_present({
+                "claim_id":     claim_id,
+                "narrative_id": narrative_id,
+                "video_id":     video_id,
+                "claim_title":  claim.get("claim_title"),
+                "claim_text":   claim.get("claim_text"),
+                "claim_vector": claim.get("claim_title_embedding"),
+                "claim_risk":   claim.get("claim_comment_risk"),
+                "fact_check":   claim.get("fact_check_assessment"),
+                "risks": _present({
+                    "sentiment": claim.get("claim_comment_sentiment"),
+                    "risk_text": claim.get("claim_comment_risk"),
+                }) or None,
+                "source":       channel_id,
+                "destination":  primary_destination,
+                "date":         now_str,
+            }))
+
+    return narrative_ids, claim_ids
+
 
 if __name__ == "__main__":
     # 1. get injected MongoDB doc from Switch
@@ -376,6 +493,7 @@ if __name__ == "__main__":
     video_id = mongo_doc.get("_id", "Unknown")
     gcs_transcript_path = mongo_doc.get("gcs_transcript_path")
     channel_title = "Example Travel Channel"
+    channel_id = mongo_doc.get("channel_id")
     tags = ["travel", "vlog", "europe", "vacation"]
     title = mongo_doc.get("title")
     description = "In this video I travel through France, Germany, and Italy." # TODO: fade
@@ -419,15 +537,33 @@ if __name__ == "__main__":
             top_comments=top_comments,
             transcript=transcript
         )
-        print("Extracted video features:")
-        print(json.dumps(features, indent=2))
-        safe_title = "".join(c if c.isalnum() or c in "._-" else "_" for c in title)
-        filename = f"features_{safe_title}.json"
-
-        # with open(filename, "w", encoding="utf-8") as f:
-        #     json.dump(features, f, indent=2, ensure_ascii=False)
-
-        print(f"Saved features to {filename}")
+        print("Extracted video features successfully")
+        # --- DATABASE INSERTION ---
+        
+        if MONGODB_URI:
+            try:
+                # Initialize MongoDB Client
+                db_client = MongoClient(MONGODB_URI)
+                db = db_client["travel_app"]
+                
+                # Build context mapping for the save function
+                ctx = {
+                    "video_id": video_id,
+                    "title": title,
+                    "description": description,
+                    "tags": tags,
+                    "top_comments": top_comments,
+                    "channel_id": channel_id,
+                    "channel_title": channel_title,
+                }
+                
+                # Save into the collections
+                n_ids, c_ids = save_features_to_collections(db, ctx, features)
+                print(f"[SUCCESS] Saved to MongoDB. Inserted {len(n_ids)} narratives and {len(c_ids)} claims.")
+            except Exception as e:
+                print(f"[ERROR] Failed to save to MongoDB: {e}")
+        else:
+            print("[WARN] MONGODB_URI not found. Skipping database insertion.")
         #sanity check for embedding vector shape : PASS
         # vec = np.array(features["video_components"]["narratives"][0]["claims"][0]["claim_title_embedding"], dtype=float)
         # print("Dim:", vec.shape[0])
