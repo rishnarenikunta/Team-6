@@ -1,0 +1,47 @@
+# --- Python & Environments ---
+# Exclude your local virtual environments (huge upload time)
+.venv/
+venv/
+env/
+ENV/
+bin/
+lib/
+# Exclude compiled bytecode
+**/__pycache__/
+**/*.py[cod]
+**/*.pyo
+
+# --- Project Data & Research ---
+# Exclude large datasets to keep the 'gcloud' upload fast
+# Based on your YOUTravel & NLP project work
+data/
+datasets/
+outputs/
+*.csv
+*.json
+*.parquet
+*.pt
+*.pth
+
+# --- Secrets & Configs ---
+# Prevent your YouTube API keys or Google Cloud JSONs from being baked in
+.env
+.env.local
+*.json
+*.pem
+*.key
+credentials/
+
+# --- IDE & System Files ---
+# Mac specific junk (you're on an M4 Pro) 
+.DS_Store
+# VS Code / IntelliJ settings
+.vscode/
+.idea/
+.history/
+
+# --- Version Control ---
+# No need to upload the entire git history to Cloud Run
+.git
+.gitignore
+.github/

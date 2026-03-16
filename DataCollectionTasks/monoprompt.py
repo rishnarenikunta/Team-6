@@ -1,6 +1,5 @@
 # main.py
 
-from curses import raw
 import os
 from dotenv import load_dotenv
 
@@ -10,8 +9,6 @@ from google.genai import types
 
 from pydantic import BaseModel, Field
 
-from sklearn.cluster import KMeans  # currently unused, but imported for later work
-import numpy as np  # currently unused, but imported for later work
 
 import json
 import requests

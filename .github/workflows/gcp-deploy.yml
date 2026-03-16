@@ -35,4 +35,6 @@ jobs:
         gcloud run jobs deploy youtravel-llm-job \
           --source . \
           --region us-central1 \
-          --quiet
+          --quiet \
+          --command python \
+          --args DataCollectionTasks/monoprompt.py
