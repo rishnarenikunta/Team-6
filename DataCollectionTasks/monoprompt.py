@@ -16,6 +16,8 @@ import numpy as np  # currently unused, but imported for later work
 import json
 import requests
 
+from google.cloud import storage
+
 load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
@@ -32,22 +34,27 @@ GENERATION_MODEL = "gemini-2.5-flash-lite"
 TRANSCRIPT_BASE_URL = "http://localhost:8000"  # adjust if different host/port
 
 
-def fetch_transcript_from_api(video_id: str) -> str:
-    url = f"{TRANSCRIPT_BASE_URL}/transcript/{video_id}"
+def fetch_transcript_from_gcs(gcs_uri: str) -> str:
+    """Fetches the transcript JSON directly from a Google Cloud Storage bucket."""
+    if not gcs_uri.startswith("gs://"):
+        print(f"[WARN] Invalid GCS URI: {gcs_uri}")
+        return ""
+    
+    # Split gs://bucket_name/path/to/file.json
+    parts = gcs_uri[5:].split("/", 1)
+    bucket_name = parts[0]
+    blob_name = parts[1] if len(parts) > 1 else ""
+
+    storage_client = storage.Client()
+    bucket = storage_client.bucket(bucket_name)
+    blob = bucket.blob(blob_name)
+    
     try:
-        resp = requests.get(url, timeout=30)
-        if resp.status_code == 404:
-            return ""
-        resp.raise_for_status()
-        return resp.json().get("text", "")
-    except requests.exceptions.ConnectionError:
-        print(f"[WARN] Transcript service unavailable for {video_id}, proceeding without transcript")
-        return ""
-    except requests.exceptions.Timeout:
-        print(f"[WARN] Transcript service timed out for {video_id}")
-        return ""
+        content = blob.download_as_text()
+        data = json.loads(content)
+        return data.get("text", "") 
     except Exception as e:
-        print(f"[WARN] Transcript fetch failed for {video_id}: {e}")
+        print(f"[WARN] Failed to fetch transcript from GCS ({gcs_uri}): {e}")
         return ""
 
 
@@ -130,8 +137,8 @@ def extract_video_features_for_video(
     title: str,
     description: str,
     top_comments: List[str],
+    transcript: str
 ) -> dict:
-    transcript = fetch_transcript_from_api(video_id)
 
     features_text = build_country_features(
         title=title,
@@ -195,8 +202,8 @@ def extract_video_features_for_video(
             _ = VideoFeatures(**data)
             print(data)
             filename = f"features_{video_id}.json"
-            with open(filename, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
+            # with open(filename, "w", encoding="utf-8") as f:
+            #     json.dump(data, f, indent=2, ensure_ascii=False)
 
             features_with_embedding: Dict[str, Any] = data
 
@@ -321,12 +328,12 @@ def classify_is_travel_video(
     title: str,
     description: str,
     top_comments: List[str],
+    transcript: str
 ) -> bool:
     """
     Uses Gemini to classify whether a video is a travel video or not.
     Returns True if Travel, False otherwise.
     """
-    transcript = fetch_transcript_from_api(video_id)
 
     prompt = build_travel_prompt(
         channel_title=channel_title,
@@ -355,27 +362,48 @@ def classify_is_travel_video(
 
 
 if __name__ == "__main__":
-    # 1. Choose a video ID that your FastAPI transcript API supports
-    test_video_id = "FPX6zAA3tJI"  # replace with your real test video
-    # 2. Provide some metadata (you can pull this from the YouTube Data API later)
+    # 1. get injected MongoDB doc from Switch
+    mongo_data_str = os.environ.get("MONGO_DOCUMENT")
+    if not mongo_data_str:
+        print("[ERROR] No MONGO_DOCUMENT found in environment variables. Exiting.")
+        exit(1)
+    try:
+        mongo_doc = json.loads(mongo_data_str)
+    except json.JSONDecodeError:
+        print("[ERROR] MONGO_DOCUMENT is not valid JSON. Exiting.")
+        exit(1)
+    # 2. Extract some metadata
+    video_id = mongo_doc.get("_id", "Unknown")
+    gcs_transcript_path = mongo_doc.get("gcs_transcript_path")
     channel_title = "Example Travel Channel"
     tags = ["travel", "vlog", "europe", "vacation"]
-    title = "Travel vlog across Europe"
-    description = "In this video I travel through France, Germany, and Italy."
+    title = mongo_doc.get("title")
+    description = "In this video I travel through France, Germany, and Italy." # TODO: fade
     top_comments = [
         "Loved the scenes from Paris!",
         "Germany looked incredible.",
         "Please visit Spain next time!",
     ]
 
-    # 3. First: classify if it's a travel video
+    # 3. Fetch transcript from GCS
+    if not gcs_transcript_path:
+        print("[ERROR] No gcs_transcript_path found in the MongoDB document. Exiting.")
+        exit(1)
+        
+    transcript = fetch_transcript_from_gcs(gcs_transcript_path)
+    if not transcript:
+        print(f"[WARN] Transcript is empty for {video_id}. Pipeline may degrade.")
+
+    print(f"Starting pipeline for Video ID: {video_id}")
+    # 4. First: classify if it's a travel video
     is_travel = classify_is_travel_video(
-        video_id=test_video_id,
+        video_id=video_id,
         channel_title=channel_title,
         tags=tags,
         title=title,
         description=description,
         top_comments=top_comments,
+        transcript=transcript
     )
 
     print(f"Is travel video? {is_travel}")
@@ -385,18 +413,19 @@ if __name__ == "__main__":
 
         #this is the features
         features = extract_video_features_for_video(
-            video_id=test_video_id,
+            video_id=video_id,
             title=title,
             description=description,
             top_comments=top_comments,
+            transcript=transcript
         )
         print("Extracted video features:")
         print(json.dumps(features, indent=2))
         safe_title = "".join(c if c.isalnum() or c in "._-" else "_" for c in title)
         filename = f"features_{safe_title}.json"
 
-        with open(filename, "w", encoding="utf-8") as f:
-            json.dump(features, f, indent=2, ensure_ascii=False)
+        # with open(filename, "w", encoding="utf-8") as f:
+        #     json.dump(features, f, indent=2, ensure_ascii=False)
 
         print(f"Saved features to {filename}")
         #sanity check for embedding vector shape : PASS

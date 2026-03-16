@@ -1,0 +1,88 @@
+{
+  "video_components": {
+    "video_summary": "This travel vlog explores the unique and traditional food of Sagada, Philippines, focusing on the consumption of 'etag,' a fermented and smoked native pork. The video also touches upon local customs like cliff burials and traditional practices.",
+    "video_topics_destinations": [
+      "Philippines",
+      "Sagada"
+    ],
+    "overall_comment_analysis": {
+      "overall_sentiment": 0.8,
+      "general_risk_callouts": []
+    },
+    "narratives": [
+      {
+        "narrative_title": "Unique and Adventurous Local Cuisine",
+        "narrative_description": "The video highlights the consumption of 'etag,' a traditional Sagada delicacy, which is presented as an unusual and potentially challenging food experience for outsiders.",
+        "narrative_comment_summary": "Comments express a mix of curiosity, apprehension, and appreciation for the adventurous food choices. Some viewers find the idea of eating fermented pork with maggots intriguing, while others express disgust or admiration for the host's bravery.",
+        "narrative_comment_risk": "Low. While the food is described as unusual, comments do not indicate widespread health concerns or dangerous practices. The primary risk is the subjective perception of 'grossness' or 'strangeness'.",
+        "claims": [
+          {
+            "claim_title": "Etag is a traditional Sagada delicacy",
+            "claim_text": "The video focuses on 'etag' in Sagada, describing it as a local food prepared by butchering and preparing the animal themselves, and comparing it to smoked pork or Serrano ham.",
+            "fact_check_assessment": "The transcript consistently refers to 'etag' as a food from Sagada and describes its preparation and taste, aligning with the claim.",
+            "claim_comment_sentiment": "Positive",
+            "claim_comment_risk": "Low"
+          },
+          {
+            "claim_title": "Etag can be eaten raw or cooked",
+            "claim_text": "The host tries uncooked etag, describing its texture as rubbery and similar to beef jerky or Serrano ham. The video also mentions that cooked etag offers a different experience.",
+            "fact_check_assessment": "The transcript explicitly details the experience of eating raw etag and notes the difference with cooked etag, supporting the claim.",
+            "claim_comment_sentiment": "Neutral",
+            "claim_comment_risk": "Low"
+          },
+          {
+            "claim_title": "Maggots in etag are a source of protein and not harmful",
+            "claim_text": "The video states that maggots are fine, full of protein, and won't kill you, though they might make you 'smile a little bit'.",
+            "fact_check_assessment": "While maggots can be a source of protein, consuming them, especially in fermented or improperly stored food, carries significant health risks, including parasitic infections and foodborne illnesses. The claim that they are 'fine' and 'won't kill you' is a dangerous oversimplification and potentially false.",
+            "claim_comment_sentiment": "Negative",
+            "claim_comment_risk": "High"
+          },
+          {
+            "claim_title": "The taste of etag is comparable to Serrano ham",
+            "claim_text": "Despite its appearance, the raw etag is described as tasting like chewy Serrano ham with a slightly putrid aftertaste, and the cooked version has a heavy, milky taste from the insects.",
+            "fact_check_assessment": "The comparison to Serrano ham is subjective. The description of a 'putrid' aftertaste and a 'heavy milky taste' from insects suggests a significant difference from typical Serrano ham.",
+            "claim_comment_sentiment": "Mixed",
+            "claim_comment_risk": "Low"
+          }
+        ]
+      },
+      {
+        "narrative_title": "Ancient Burial Traditions",
+        "narrative_description": "The video briefly touches upon the unique burial customs of Sagada, specifically the practice of placing coffins on cliff faces.",
+        "narrative_comment_summary": "Comments do not directly address the burial traditions, focusing more on the food aspect. There is no specific commentary on this narrative.",
+        "narrative_comment_risk": "Not Applicable. No comments directly address this narrative.",
+        "claims": [
+          {
+            "claim_title": "Coffins are placed on cliffs in Sagada",
+            "claim_text": "The speaker mentions visiting cliffs to find coffins and seeking permission from a village elder whose ancestors are buried there.",
+            "fact_check_assessment": "The practice of hanging coffins is a known traditional burial custom in Sagada, Philippines.",
+            "claim_comment_sentiment": "Not Applicable",
+            "claim_comment_risk": "Not Applicable"
+          }
+        ]
+      },
+      {
+        "narrative_title": "Cultural Practices and Perceptions",
+        "narrative_description": "The video explores local customs, including a mention of circumcision practices for young boys and the host's anticipation of viewers finding the food 'crazy'.",
+        "narrative_comment_summary": "Comments do not directly address the circumcision practice. Viewers express curiosity and admiration for the host's willingness to try unusual foods.",
+        "narrative_comment_risk": "Low. The comments are generally positive or curious about the cultural experiences.",
+        "claims": [
+          {
+            "claim_title": "Circumcision is performed on boys aged nine and above",
+            "claim_text": "The transcript mentions a sign indicating blood donation but for circumcision, for ages nine years and above, and confirms this is common.",
+            "fact_check_assessment": "While the video mentions this, it's a brief observation and not a central theme. General medical information suggests circumcision can be performed at various ages, including older children and adults, for medical, religious, or personal reasons. The specific age of nine and above as 'common' requires further context not provided.",
+            "claim_comment_sentiment": "Not Applicable",
+            "claim_comment_risk": "Low"
+          },
+          {
+            "claim_title": "Traditional tools for cutting were sharp bamboo",
+            "claim_text": "The speaker mentions that in the past, sharp bamboo was used for cutting.",
+            "fact_check_assessment": "Historical accounts and anthropological studies sometimes mention the use of sharpened bamboo or bone for various purposes in traditional societies, including minor surgical procedures or food preparation.",
+            "claim_comment_sentiment": "Not Applicable",
+            "claim_comment_risk": "Not Applicable"
+          }
+        ]
+      }
+    ]
+  }
+}
