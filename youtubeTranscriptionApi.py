@@ -183,27 +183,6 @@ def upload_transcript_to_gcs(video_id: str, transcript_text: str) -> str:
 
 load_dotenv()
 
-MONGODB_URI = os.getenv("MONGODB_URI")
-MONGODB_DB = os.getenv("MONGODB_DB", "travel_app")
-MONGODB_COLLECTION = os.getenv("MONGODB_COLLECTION", "videos")
-VIDEOS_COLLECTION = os.getenv("VIDEOS_COLLECTION", "videos")
-COMMENTS_COLLECTION = os.getenv("COMMENTS_COLLECTION", "comments")
-METADATA_COLLECTION = os.getenv("METADATA_COLLECTION", "metadata")
-
-mongo_client = MongoClient(MONGODB_URI) if MONGODB_URI else None
-db = mongo_client[MONGODB_DB] if mongo_client else None
-
-videos_col = db[VIDEOS_COLLECTION] if db is not None else None
-comments_col = db[COMMENTS_COLLECTION] if db is not None else None
-metadata_col = db[METADATA_COLLECTION] if db is not None else None
-
-@app.get("/")
-def home():
-    return {
-        "status": "Online",
-        "message": "Go to /docs to test the transcript tool"
-    }
-
 def clean_vtt_text(raw: str) -> str:
     raw = html.unescape(raw)
     lines = raw.splitlines()
@@ -439,23 +418,23 @@ def try_subtitles_first(video_id: str) -> Optional[str]:
 
 
 def try_whisper_next(video_id: str, model: str = "gpt-4o-mini-transcribe") -> Optional[str]:
-def save_metadata_to_mongo(metadata: dict):
-    if metadata_col is None:
-        raise HTTPException(status_code=500, detail="Mongo not configured. Set MONGODB_URI.")
+    def save_metadata_to_mongo(metadata: dict):
+        if metadata_col is None:
+            raise HTTPException(status_code=500, detail="Mongo not configured. Set MONGODB_URI.")
 
-    video_id = metadata.get("video_id")
-    if not video_id:
-        raise HTTPException(status_code=500, detail="Missing video_id in metadata")
+        video_id = metadata.get("video_id")
+        if not video_id:
+            raise HTTPException(status_code=500, detail="Missing video_id in metadata")
 
-    metadata_col.update_one(
-        {"_id": video_id},
-        {
-            "$set": {
-                **metadata,
-                "updated_at": datetime.now(timezone.utc),
-            }
-        },
-        upsert=True
+        metadata_col.update_one(
+            {"_id": video_id},
+            {
+                "$set": {
+                    **metadata,
+                    "updated_at": datetime.now(timezone.utc),
+                }
+            },
+            upsert=True
     )
 
 @app.get("/metadata/{video_id}")
@@ -741,31 +720,90 @@ def fetch_transcript_text(video_id: str, model: str = "gpt-4o-mini-transcribe") 
     return try_whisper_next(video_id, model=model)
 
 
-def fetch_comments(video_id: str, n: int = 10, timeout_sec: int = 180):
+# def fetch_comments(video_id: str, n: int = 10, timeout_sec: int = 180):
+#     url = f"https://www.youtube.com/watch?v={video_id}"
+#     cookies = os.getenv("YT_COOKIES_PATH")
+
+#     max_comments = max(1, min(200, n * 10))
+
+#     cmd = [
+#         PY, "-m", "yt_dlp",
+#         "--quiet",
+#         "--no-warnings",
+#         "--skip-download",
+#         "--retries", "10",
+#         "--extractor-retries", "10",
+#         "--sleep-requests", "0.75",
+#         "--sleep-interval", "10",
+#         "--max-sleep-interval", "20",
+#         "--extractor-args", f"youtube:player_client=web;comment_sort=top;max_comments={max_comments}",
+#         "--js-runtimes", "node",
+#         "--remote-components", "ejs:github",
+#         "--get-comments",
+#         "--dump-single-json",
+#         "--ignore-no-formats-error",
+#         url,
+#     ]
+
+#     cmd = _insert_cookies_flag(cmd, cookies)
+
+#     try:
+#         proc = subprocess.run(
+#             cmd,
+#             capture_output=True,
+#             text=True,
+#             timeout=timeout_sec,
+#         )
+#     except subprocess.TimeoutExpired:
+#         raise HTTPException(status_code=504, detail=f"Timed out fetching comments after {timeout_sec}s for {video_id}")
+
+#     if proc.returncode != 0:
+#         raise HTTPException(
+#             status_code=500,
+#             detail=f"yt-dlp comments error for {video_id}: {proc.stderr.strip() or proc.stdout.strip()}",
+#         )
+
+#     try:
+#         data = json.loads(proc.stdout)
+#     except Exception:
+#         raise HTTPException(
+#             status_code=500,
+#             detail=f"Failed to parse yt-dlp JSON for {video_id}. stderr={proc.stderr.strip()[:500]} stdout_head={proc.stdout[:500]}",
+#         )
+
+#     comments = data.get("comments") or []
+#     comments.sort(key=lambda c: (c.get("like_count") or 0), reverse=True)
+
+#     top = []
+#     for c in comments[:n]:
+#         top.append({
+#             "id": c.get("id"),
+#             "author": c.get("author"),
+#             "text": c.get("text") or c.get("content"),
+#             "like_count": c.get("like_count"),
+#             "timestamp": c.get("timestamp"),
+#             "parent": c.get("parent"),
+#         })
+
+#     return top
+
+
+def fetch_comments(video_id: str, n: int = 10, timeout_sec: int = 60):
     url = f"https://www.youtube.com/watch?v={video_id}"
     cookies = os.getenv("YT_COOKIES_PATH")
 
-    max_comments = max(1, min(200, n * 10))
-
     cmd = [
-        PY, "-m", "yt_dlp",
-        "--quiet",
-        "--no-warnings",
+        "yt-dlp",
+        "--ignore-config",
         "--skip-download",
-        "--retries", "10",
-        "--extractor-retries", "10",
-        "--sleep-requests", "0.75",
-        "--sleep-interval", "10",
-        "--max-sleep-interval", "20",
-        "--extractor-args", f"youtube:player_client=web;comment_sort=top;max_comments={max_comments}",
-        "--js-runtimes", "node",
-        "--remote-components", "ejs:github",
         "--get-comments",
+        "--extractor-args", "youtube:comment_sort=top",  #top comments
         "--dump-single-json",
         url,
     ]
 
-    cmd = _insert_cookies_flag(cmd, cookies)
+    if cookies and os.path.exists(cookies):
+        cmd[1:1] = ["--cookies", cookies]
 
     try:
         proc = subprocess.run(
@@ -775,23 +813,17 @@ def fetch_comments(video_id: str, n: int = 10, timeout_sec: int = 180):
             timeout=timeout_sec,
         )
     except subprocess.TimeoutExpired:
-        raise HTTPException(status_code=504, detail=f"Timed out fetching comments after {timeout_sec}s for {video_id}")
+        raise HTTPException(status_code=504, detail=f"Timed out fetching comments after {timeout_sec}s")
 
     if proc.returncode != 0:
         raise HTTPException(
             status_code=500,
-            detail=f"yt-dlp comments error for {video_id}: {proc.stderr.strip() or proc.stdout.strip()}",
+            detail=f"yt-dlp comments error: {proc.stderr.strip() or proc.stdout.strip()}",
         )
 
-    try:
-        data = json.loads(proc.stdout)
-    except Exception:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to parse yt-dlp JSON for {video_id}. stderr={proc.stderr.strip()[:500]} stdout_head={proc.stdout[:500]}",
-        )
-
+    data = json.loads(proc.stdout)
     comments = data.get("comments") or []
+
     comments.sort(key=lambda c: (c.get("like_count") or 0), reverse=True)
 
     top = []
@@ -848,83 +880,69 @@ def home():
 
 @app.get("/transcript/{video_id}")
 def get_transcript(video_id: str):
+    video_url = f"https://www.youtube.com/watch?v={video_id}"
     cookies_path = os.getenv("YT_COOKIES_PATH")
     if not cookies_path or not os.path.exists(cookies_path):
         raise HTTPException(status_code=500, detail="Missing YT_COOKIES_PATH or cookies file not found")
 
-    info = fetch_video_info(video_id)
-    transcript_text = fetch_transcript_text(video_id)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        ydl_opts = {
+            "skip_download": True,
+            "writesubtitles": True,
+            "writeautomaticsub": True,
+            "subtitleslangs": ["en"],
+            "subtitlesformat": "vtt",
+            "outtmpl": os.path.join(tmpdir, "%(id)s.%(ext)s"),
+            "quiet": True,
+            "cookiefile": cookies_path,
+            "ignoreconfig": True,
+        }
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([video_url])
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"yt-dlp error: {str(e)}")
 
-    if transcript_text:
-        print(f"[TRANSCRIPT OK] {video_id} chars={len(transcript_text)}")
-    else:
-        print(f"[TRANSCRIPT MISSING] {video_id} (subtitles unavailable and Whisper failed/skipped)")
+        vtt_files = [os.path.join(tmpdir, f) for f in os.listdir(tmpdir) if f.endswith(".vtt")]
+        if not vtt_files:
+            raise HTTPException(status_code=404, detail="No subtitles found for this video")
 
-    if not transcript_text:
-        raise HTTPException(status_code=404, detail="No usable subtitles found and Whisper fallback failed")
+        vtt_file = max(vtt_files, key=lambda p: os.path.getsize(p))
+        with open(vtt_file, "r", encoding="utf-8") as f:
+            raw_vtt = f.read()
 
-    transcript_path = upload_transcript_to_gcs(video_id, transcript_text)
+        cleaned_text = clean_vtt_text(raw_vtt)
+        if not cleaned_text:
+            raise HTTPException(status_code=404, detail="Subtitle file found but no readable text extracted")
 
-    top_comments = []
-    try:
-        top_comments = fetch_comments(video_id, n=10, timeout_sec=180)
-        print(f"[COMMENTS OK] {video_id} n={len(top_comments)}")
-        save_comments_to_mongo(video_id, top_comments)
-        print(f"[MONGO COMMENTS OK] {video_id}")
-    except Exception as e:
-        print(f"[COMMENTS FAIL] {video_id} err={str(e)[:200]}")
-        top_comments = []
-
-    metadata = {
-        "video_id": info["video_id"],
-        "title": info["title"],
-        "webpage_url": info["webpage_url"],
-        "upload_date": info["upload_date"],
-        "views": info["view_count"],
-        "likes": info["like_count"],
-        "comment_count": info["comment_count"],
-        "uploader": info["uploader"],
-        "channel_id": info["channel_id"],
-        "channel_url": info["channel_url"],
-        "gcs_transcript_path": transcript_path,
-    }
-
-    save_metadata_to_mongo(metadata)
-    print(f"[MONGO METADATA OK] {video_id}")
-
-    return {
-        "video_id": video_id,
-        "gcs_transcript_path": transcript_path,
-        "text": transcript_text,
-        "metadata": metadata,
-        "top_comments": top_comments,
-    }
+        gcs_path = upload_transcript_to_gcs(video_id, cleaned_text)
+        return {"video_id": video_id, "gcs_path": gcs_path, "text": cleaned_text}
 
 
-@app.get("/metadata/{video_id}")
-def get_metadata(video_id: str):
-    try:
-        info = fetch_video_info(video_id)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"yt-dlp metadata error: {str(e)}")
+# @app.get("/metadata/{video_id}")
+# def get_metadata(video_id: str):
+#     try:
+#         info = fetch_video_info(video_id)
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=f"yt-dlp metadata error: {str(e)}")
 
-    metadata = {
-        "video_id": info["video_id"],
-        "title": info["title"],
-        "webpage_url": info["webpage_url"],
-        "upload_date": info["upload_date"],
-        "views": info["view_count"],
-        "likes": info["like_count"],
-        "comment_count": info["comment_count"],
-        "uploader": info["uploader"],
-        "channel_id": info["channel_id"],
-        "channel_url": info["channel_url"],
-    }
+#     metadata = {
+#         "video_id": info["video_id"],
+#         "title": info["title"],
+#         "webpage_url": info["webpage_url"],
+#         "upload_date": info["upload_date"],
+#         "views": info["view_count"],
+#         "likes": info["like_count"],
+#         "comment_count": info["comment_count"],
+#         "uploader": info["uploader"],
+#         "channel_id": info["channel_id"],
+#         "channel_url": info["channel_url"],
+#     }
 
-    save_metadata_to_mongo(metadata)
-    print(f"[MONGO METADATA OK] {video_id}")
+#     save_metadata_to_mongo(metadata)
+#     print(f"[MONGO METADATA OK] {video_id}")
 
-    return metadata
+#     return metadata
 
 
 @app.get("/comments/{video_id}")
@@ -1105,47 +1123,3 @@ def transcribe_youtube(req: YouTubeRequest):
         "sort": "top",
         "comments": comments
     }
-
-def save_comments_to_mongo(video_id: str, comments: list, sort: str = "top"):
-    if comments_col is None:
-        raise HTTPException(status_code=500, detail="Mongo not configured. Set MONGODB_URI.")
-
-    now = datetime.now(timezone.utc)
-    operations = []
-
-    for c in comments:
-        comment_id = c.get("id")
-        if not comment_id:
-            continue
-
-        mongo_id = f"{video_id}:{comment_id}"
-
-        doc = {
-            "_id": mongo_id,
-            "video_id": video_id,
-            "comment_id": comment_id,
-            "author": c.get("author"),
-            "text": c.get("text"),
-            "like_count": c.get("like_count") or 0,
-            "timestamp": c.get("timestamp"),
-            "parent": c.get("parent") or "root",
-            "updated_at": now,
-        }
-
-        operations.append(
-            UpdateOne(
-                {"_id": mongo_id},
-                {"$set": doc},
-                upsert=True
-            )
-        )
-
-    if operations:
-        result = comments_col.bulk_write(operations, ordered=False)
-        return {
-            "matched": result.matched_count,
-            "modified": result.modified_count,
-            "upserted": len(result.upserted_ids),
-        }
-
-    return {"matched": 0, "modified": 0, "upserted": 0}
