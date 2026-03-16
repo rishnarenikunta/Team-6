@@ -503,6 +503,7 @@ if __name__ == "__main__":
     # 3. Fetch transcript from GCS
     if not gcs_transcript_path:
         print("[ERROR] No gcs_transcript_path found in the MongoDB document. Exiting.")
+        print(mongo_doc)
         exit(1)
         
     transcript = fetch_transcript_from_gcs(gcs_transcript_path)
