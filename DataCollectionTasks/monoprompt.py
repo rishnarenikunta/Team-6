@@ -478,6 +478,7 @@ def save_features_to_collections(db, ctx: dict, features: Dict[str, Any]) -> tup
 if __name__ == "__main__":
     # 1. get injected MongoDB doc from Switch
     mongo_data_str = os.environ.get("MONGO_DOCUMENT")
+    print("data", mongo_data_str)
     if not mongo_data_str:
         print("[ERROR] No MONGO_DOCUMENT found in environment variables. Exiting.")
         exit(1)
