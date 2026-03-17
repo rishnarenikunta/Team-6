@@ -373,7 +373,7 @@ def save_features_to_collections(db, ctx: dict, features: Dict[str, Any]) -> tup
     narratives  ← one doc per narrative (with embedding)
     claims      ← one doc per claim    (with embedding)
     """
-    videos_col = db["videos"]
+    videos_col = db["metadata"]
     creators_col = db["creators"]
     narratives_col = db["narratives"]
     claims_col = db["claims"]
@@ -384,6 +384,7 @@ def save_features_to_collections(db, ctx: dict, features: Dict[str, Any]) -> tup
 
     video_id = ctx.get("video_id")
     channel_id = ctx.get("channel_id")
+    upload_date = ctx.get("upload_date")
 
     # 1. Update Videos Collection
     comment_analysis = vc.get("overall_comment_analysis") or {}
@@ -445,6 +446,7 @@ def save_features_to_collections(db, ctx: dict, features: Dict[str, Any]) -> tup
             }) or None,
             "destination":      primary_destination,
             "date":             now,
+            "upload_date":      upload_date,
         }))
 
         for claim in (narrative.get("claims") or []):
@@ -470,6 +472,7 @@ def save_features_to_collections(db, ctx: dict, features: Dict[str, Any]) -> tup
                 "source":       channel_id,
                 "destination":  primary_destination,
                 "date":         now_str,
+                "upload_date":  upload_date,
             }))
 
     return narrative_ids, claim_ids
@@ -500,6 +503,7 @@ if __name__ == "__main__":
         "Germany looked incredible.",
         "Please visit Spain next time!",
     ]
+    upload_date = mongo_doc.get("upload_date")
 
     # 3. Fetch transcript from GCS
     if not gcs_transcript_path:
@@ -554,6 +558,7 @@ if __name__ == "__main__":
                     "top_comments": top_comments,
                     "channel_id": channel_id,
                     "channel_title": channel_title,
+                    "upload_date": upload_date,
                 }
                 
                 # Save into the collections
