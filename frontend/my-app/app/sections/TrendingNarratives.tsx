@@ -88,7 +88,7 @@ export default function TrendingNarratives() {
 
                 <div>
                   <div className="text-3xl font-bold">{selected.views.toLocaleString()}</div>
-                  <div className="text-sm">Views</div>
+                  <div className="text-sm">HIViews</div>
                 </div>
 
                 <div>

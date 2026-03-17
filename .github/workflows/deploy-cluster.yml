@@ -1,0 +1,64 @@
+name: Deploy Cluster Job
+
+on:
+  push:
+    branches: [integration]
+    paths:
+      - 'backend/cluster.py'        # only triggers if cluster.py changes
+      - 'Dockerfile.cluster'
+      - '.github/workflows/deploy-cluster.yml'
+
+env:
+  PROJECT_ID: youtravel-487521       # ← change this
+  REGION: us-central1                   # ← change this
+  REPO: cluster-repo
+  IMAGE: cluster-job
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write                   # needed for Workload Identity
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
+
+      - name: Build and push image
+        run: |
+          IMAGE_URI="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ env.IMAGE }}:${{ github.sha }}"
+          docker build -f Dockerfile.cluster -t $IMAGE_URI .
+          docker push $IMAGE_URI
+          echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
+
+      - name: Deploy to Cloud Run Job
+        run: |
+          gcloud run jobs update cluster-weekly-job \
+            --image $IMAGE_URI \
+            --region ${{ env.REGION }} \
+            --set-secrets "MONGODB_URI=MONGODB_URI:latest" \
+            --memory 2Gi \
+            --cpu 2 \
+            --task-timeout 3600 \
+            || \
+          gcloud run jobs create cluster-weekly-job \
+            --image $IMAGE_URI \
+            --region ${{ env.REGION }} \
+            --set-secrets "MONGODB_URI=MONGODB_URI:latest" \
+            --memory 2Gi \
+            --cpu 2 \
+            --task-timeout 3600
