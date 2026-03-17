@@ -2,7 +2,7 @@ name: Deploy Cluster Job
 
 on:
   push:
-    branches: [integration]
+    branches: [aaryaa-backend]
     paths:
       - 'backend/cluster.py'        # only triggers if cluster.py changes
       - 'Dockerfile.cluster'
