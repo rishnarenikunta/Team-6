@@ -50,6 +50,7 @@ jobs:
             --image $IMAGE_URI \
             --region ${{ env.REGION }} \
             --set-secrets "MONGODB_URI=MONGODB_URI:latest" \
+            --service-account "cluster-job-sa@${{ env.PROJECT_ID }}.iam.gserviceaccount.com" \
             --memory 2Gi \
             --cpu 2 \
             --task-timeout 3600 \
