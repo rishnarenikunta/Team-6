@@ -1828,7 +1828,7 @@ def get_transcript(video_id: str):
 
     text = fetch_transcript_text(video_id)
     if not text:
-        raise HTTPException(status_code=404, detail="No subtitles found and Whisper fallback failed")
+        raise HTTPException(status_code=404, detail="No subtitles found")
 
     gcs_path = upload_transcript_to_gcs(video_id, text)
     return {"video_id": video_id, "gcs_path": gcs_path, "text": text}
