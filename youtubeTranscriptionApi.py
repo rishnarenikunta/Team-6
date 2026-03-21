@@ -1643,7 +1643,7 @@ def try_whisper_next(video_id: str, model: str = "gpt-4o-mini-transcribe") -> Op
                 "--extractor-retries", "10",
                 "--extractor-args", "youtube:player_client=web",
                 "--js-runtimes", "node",
-                "-f", "bestaudio/best",
+                "-f", "bestaudio[ext=m4a]/bestaudio[ext=mp3]/bestaudio[ext=webm]/140/251/bestaudio/best",
                 "-o", os.path.join(tmpdir, "audio.%(ext)s"),
                 video_url,
             ]
