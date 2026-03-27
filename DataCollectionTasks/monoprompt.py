@@ -31,7 +31,7 @@ client = genai.Client(
 # for m in client.models.list():
 #     print(m.name)
 
-GENERATION_MODEL = "gemini-3.1-flash"
+GENERATION_MODEL = "gemini-3.1-flash-lite-preview"
 TRANSCRIPT_BASE_URL = "http://localhost:8000"  # adjust if different host/port
 
 
