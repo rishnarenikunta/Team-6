@@ -18,7 +18,7 @@ export default function Navbar() {
         {/* <NavLink href="/discover" label="Discover" /> */}
         <NavLink href="/narratives" label="Narratives" />
         <NavLink href="/creators" label="Creators" />
-        <NavLink href="/settings" label="Settings" />
+        {/* <NavLink href="/settings" label="Settings" /> */}
       </nav>
 
       <div className="mt-auto space-y-2 text-xs text-gray-500">

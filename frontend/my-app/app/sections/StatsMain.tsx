@@ -14,9 +14,8 @@ export default function StatsMain() {
       value: "12,487"
     },
     {
-      title: "Active Risk Alerts",
-      value: "6",
-      subtitle: "Potential misinformation or high-negative sentiment spikes detected"
+      title: "Trending Creators",
+      value: "6"
     }
   ]
 
