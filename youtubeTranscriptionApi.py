@@ -450,7 +450,7 @@ def fetch_transcript_text(video_id: str, model: str = "gpt-4o-mini-transcribe") 
     return try_whisper_next(video_id, model=model)
 
 
-def fetch_comments(video_id: str, n: int = 10, timeout_sec: int = 60):
+def fetch_comments(video_id: str, n: int = 10, timeout_sec: int = 600):
     url = f"https://www.youtube.com/watch?v={video_id}"
     cookies = os.getenv("YT_COOKIES_PATH")
     cmd = [
@@ -601,7 +601,7 @@ def get_metadata(video_id: str, gcs_transcript_path: Optional[str] = None):
     return metadata
 
 @app.get("/comments/{video_id}")
-def get_comments(video_id: str, n: int = 10, timeout_sec: int = 300):
+def get_comments(video_id: str, n: int = 10, timeout_sec: int = 600):
     if n < 1 or n > 50:
         raise HTTPException(status_code=400, detail="n must be between 1 and 50")
 
