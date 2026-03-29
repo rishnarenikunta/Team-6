@@ -6,6 +6,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pymongo import MongoClient
 from typing import Any
+from typing import Any, Dict, List, Optional
 
 load_dotenv()
 
@@ -57,6 +58,7 @@ def get_trending_topics() -> dict:
     # Pull distinct destinations or tags from your DB
     destinations = db["narratives"].distinct("destination")
     return {"topics": destinations}
+
 @app.get("/api/narratives/trending")
 def get_trending_narratives() -> list[dict[str, Any]]:
     docs = list(
@@ -90,13 +92,16 @@ def get_trending_narratives() -> list[dict[str, Any]]:
     return result
 
 @app.get("/api/destinations")
-def get_destinations(region: str | None = None, tag: str | None = None) -> list[dict[str, Any]]:
+def get_destinations(
+    region: Optional[str] = None,
+    tag: Optional[str] = None,
+) -> List[Dict[str, Any]]:
 
-    REGIONS: dict[str, list[str]] = {
-        "asia":     ["Japan", "South Korea", "Thailand", "Vietnam"],
-        "europe":   ["Portugal", "France", "Italy", "Spain", "Germany"],
-        "americas": ["Mexico", "USA", "Canada", "Brazil"],
-    }
+    REGIONS: Dict[str, List[str]] = {
+    "asia":     ["Japan", "South Korea", "Thailand", "Vietnam"],
+    "europe":   ["Portugal", "France", "Italy", "Spain", "Germany"],
+    "americas": ["Mexico", "USA", "Canada", "Brazil"],
+}
 
     # Get all unique destinations from narratives
     match: dict = {}
