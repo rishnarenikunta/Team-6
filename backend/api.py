@@ -280,3 +280,287 @@ print("Total narratives:", db["narratives"].count_documents({}))
 print("Total claims:",     db["claims"].count_documents({}))
 print("Top narratives computed:", db["top_narratives"].count_documents({}))
 print("Top claims computed:", db["top_claims"].count_documents({}))
+
+# ─────────────────────────────────────────────────────────────────────────────
+# NEW ENDPOINTS — paste these into api.py
+# ─────────────────────────────────────────────────────────────────────────────
+
+from math import floor
+
+
+# ── /api/stats/main ──────────────────────────────────────────────────────────
+# Powers StatsMain.tsx
+# Returns: topDestination, active narratives count, total claims, trending
+#          creator count, and creator tier breakdown.
+
+@app.get("/api/stats/main")
+def get_main_stats() -> dict[str, Any]:
+
+    # ── Destination popularity: count narratives per destination ──────────────
+    dest_pipeline = [
+        {"$group": {"_id": "$destination", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+    ]
+    dest_counts = list(db["narratives"].aggregate(dest_pipeline))
+
+    top_dest_name   = dest_counts[0]["_id"]   if dest_counts else "Unknown"
+    top_dest_count  = dest_counts[0]["count"] if dest_counts else 0
+    second_count    = dest_counts[1]["count"] if len(dest_counts) > 1 else 0
+
+    # Growth = how many more narratives top dest has vs #2, expressed as %
+    if second_count > 0:
+        growth_pct = round((top_dest_count - second_count) / second_count * 100, 1)
+    else:
+        growth_pct = 100.0
+
+    top_destination = {
+        "name":   top_dest_name,
+        "growth": growth_pct,        # e.g. 25.0  → "25% more narratives than #2"
+    }
+
+    # ── Narrative & claim counts ──────────────────────────────────────────────
+    active_narratives = db["narratives"].count_documents({})
+    total_claims      = db["claims"].count_documents({})
+
+    # ── Creator tiers ─────────────────────────────────────────────────────────
+    # Micro: 0–50K  |  Mid: 50K–500K  |  Large: 500K–1M  |  Enterprise: 1M+
+    all_creators = list(db["creators"].find({}, {"_id": 0, "subscriber_count": 1}))
+    total_creators = len(all_creators)
+
+    tiers = {"micro": 0, "mid_tier": 0, "large": 0, "enterprise": 0}
+    for c in all_creators:
+        subs = c.get("subscriber_count", 0)
+        if subs < 50_000:
+            tiers["micro"] += 1
+        elif subs < 500_000:
+            tiers["mid_tier"] += 1
+        elif subs < 1_000_000:
+            tiers["large"] += 1
+        else:
+            tiers["enterprise"] += 1
+
+    def pct(n):
+        return round(n / total_creators * 100, 1) if total_creators else 0
+
+    creator_insights = {
+        "total": total_creators,
+        "tiers": {
+            "micro":      {"count": tiers["micro"],      "pct": pct(tiers["micro"])},
+            "mid_tier":   {"count": tiers["mid_tier"],   "pct": pct(tiers["mid_tier"])},
+            "large":      {"count": tiers["large"],      "pct": pct(tiers["large"])},
+            "enterprise": {"count": tiers["enterprise"], "pct": pct(tiers["enterprise"])},
+        },
+    }
+
+    # ── Trending creators = creators who have a top_narrative entry ───────────
+    trending_creator_count = db["top_narratives"].distinct("channel_id")
+    trending_creators_n    = len(trending_creator_count)
+
+    return {
+        "top_destination":      top_destination,
+        "active_narratives":    active_narratives,
+        "total_claims":         total_claims,
+        "trending_creators":    trending_creators_n,
+        "creator_insights":     creator_insights,
+    }
+
+
+# ── /api/narratives ──────────────────────────────────────────────────────────
+# Powers /narratives/page.tsx  — paginated list of all narratives
+# Query params: destination (optional filter), limit, offset
+
+@app.get("/api/narratives")
+def list_narratives(
+    destination: str | None = None,
+    limit: int = 20,
+    offset: int = 0,
+) -> dict[str, Any]:
+
+    match: dict = {}
+    if destination:
+        match["destination"] = {"$regex": destination, "$options": "i"}
+
+    total = db["narratives"].count_documents(match)
+    docs  = list(
+        db["narratives"]
+        .find(match, {"narrative_vector": 0})   # omit heavy vector field
+        .sort("date", -1)
+        .skip(offset)
+        .limit(limit)
+    )
+
+    # Enrich with creator name
+    creators     = list(db["creators"].find({}, {"_id": 0}))
+    creator_map  = {c["channel_id"]: c for c in creators}
+
+    items = [
+        {
+            "id":           str(doc["_id"]),
+            "narrative_id": doc.get("narrative_id", ""),
+            "text":         doc.get("narrative_text", ""),
+            "destination":  doc.get("destination", ""),
+            "date":         doc["date"].isoformat() if doc.get("date") else None,
+            "channel_id":   doc.get("channel_id", ""),
+            "creator_name": creator_map.get(doc.get("channel_id", ""), {}).get("name", ""),
+            # slug = narrative_id (e.g. "narr_kyoto_01") used for detail URL
+            "slug":         doc.get("narrative_id", str(doc["_id"])),
+        }
+        for doc in docs
+    ]
+
+    return {"total": total, "offset": offset, "limit": limit, "items": items}
+
+
+# ── /api/narratives/{slug} ───────────────────────────────────────────────────
+# Powers /narratives/[slug]/page.tsx — single narrative detail
+
+@app.get("/api/narratives/{slug}")
+def get_narrative_detail(slug: str) -> dict[str, Any]:
+
+    # slug = narrative_id value (e.g. "narr_kyoto_01")
+    doc = db["narratives"].find_one(
+        {"narrative_id": slug},
+        {"narrative_vector": 0},
+    )
+    if not doc:
+        raise HTTPException(status_code=404, detail="Narrative not found")
+
+    destination = doc.get("destination", "")
+    channel_id  = doc.get("channel_id", "")
+
+    creator = db["creators"].find_one({"channel_id": channel_id}, {"_id": 0}) or {}
+
+    # Related claims for the same destination
+    related_claims = list(
+        db["claims"].find(
+            {"destination": destination},
+            {"_id": 0, "claim_text": 1, "source": 1, "claim_risk": 1, "date": 1},
+        ).limit(10)
+    )
+
+    # Top cluster result for this destination (if available)
+    cluster = db["top_narratives"].find_one({
+        "destination_id": destination,
+        "scope_type": "destination",
+        "content_type": "narratives",
+    })
+
+    # Other narratives for same destination (siblings)
+    siblings = list(
+        db["narratives"].find(
+            {"destination": destination, "narrative_id": {"$ne": slug}},
+            {"narrative_vector": 0, "_id": 0, "narrative_id": 1, "narrative_text": 1},
+        ).limit(5)
+    )
+
+    return {
+        "id":             str(doc["_id"]),
+        "narrative_id":   doc.get("narrative_id", ""),
+        "slug":           slug,
+        "text":           doc.get("narrative_text", ""),
+        "destination":    destination,
+        "date":           doc["date"].isoformat() if doc.get("date") else None,
+        "channel_id":     channel_id,
+        "creator_name":   creator.get("name", ""),
+        "creator_subs":   creator.get("subscriber_count", 0),
+        "creator_views":  creator.get("views", 0),
+        "cluster_size":   cluster.get("clusterSize") if cluster else None,
+        "top_narrative":  cluster.get("narrative") if cluster else None,
+        "related_claims": related_claims,
+        "related_narratives": [
+            {"slug": s["narrative_id"], "text": s["narrative_text"]}
+            for s in siblings
+        ],
+    }
+
+
+# ── /api/destinations/top ────────────────────────────────────────────────────
+# Powers TopCountries.tsx
+# Returns destinations ranked by narrative count with claim count included
+
+@app.get("/api/destinations/top")
+def get_top_destinations(limit: int = 10) -> list[dict[str, Any]]:
+
+    pipeline = [
+        {"$group": {"_id": "$destination", "narrative_count": {"$sum": 1}}},
+        {"$sort": {"narrative_count": -1}},
+        {"$limit": limit},
+    ]
+    dest_groups = list(db["narratives"].aggregate(pipeline))
+
+    # Claim counts per destination
+    claim_pipeline = [
+        {"$group": {"_id": "$destination", "claim_count": {"$sum": 1}}},
+    ]
+    claim_groups = list(db["claims"].aggregate(claim_pipeline))
+    claim_map = {g["_id"]: g["claim_count"] for g in claim_groups}
+
+    results = []
+    for g in dest_groups:
+        dest = g["_id"]
+        results.append({
+            "name":            dest,
+            "narrative_count": g["narrative_count"],
+            "claim_count":     claim_map.get(dest, 0),
+            # Simple growth proxy: share of total narratives (%)
+            "share_pct": None,   # filled below
+        })
+
+    total_narratives = sum(r["narrative_count"] for r in results)
+    for r in results:
+        r["share_pct"] = round(r["narrative_count"] / total_narratives * 100, 1) if total_narratives else 0
+
+    return results
+
+
+# ── /api/destinations/trending-locations ─────────────────────────────────────
+# Powers TrendingLocations.tsx
+# Top 3 destinations + simulated monthly mention timeline
+# (Since we don't store time-series data, we bucket existing docs by month)
+
+@app.get("/api/destinations/trending-locations")
+def get_trending_locations() -> list[dict[str, Any]]:
+
+    # Top 3 destinations by narrative count
+    pipeline = [
+        {"$group": {"_id": "$destination", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+        {"$limit": 3},
+    ]
+    top3 = list(db["narratives"].aggregate(pipeline))
+
+    results = []
+    for item in top3:
+        dest = item["_id"]
+
+        # Mentions over time: group narratives by year-month
+        time_pipeline = [
+            {"$match": {"destination": dest}},
+            {
+                "$group": {
+                    "_id": {
+                        "year":  {"$year": "$date"},
+                        "month": {"$month": "$date"},
+                    },
+                    "mentions": {"$sum": 1},
+                }
+            },
+            {"$sort": {"_id.year": 1, "_id.month": 1}},
+        ]
+        time_docs = list(db["narratives"].aggregate(time_pipeline))
+
+        timeline = [
+            {
+                "period": f"{t['_id']['year']}-{t['_id']['month']:02d}",
+                "mentions": t["mentions"],
+            }
+            for t in time_docs
+        ]
+
+        results.append({
+            "name":     dest,
+            "total":    item["count"],
+            "timeline": timeline,
+        })
+
+    return results
