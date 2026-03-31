@@ -14,6 +14,12 @@ type ContentCreator = {
   sentiment: { positive: number; neutral: number; negative: number }
   topThemes: string[]
   highlightedComments: string[]
+  risk: RiskStats[]
+}
+
+type RiskStats = {
+  riskTitle: string
+  riskDescription: string
 }
 
 const creators: ContentCreator[] = [
@@ -31,6 +37,15 @@ const creators: ContentCreator[] = [
     highlightedComments: [
       "Gear lists are actually realistic—no fluff, just what works on trail.",
       "Appreciate the wet-weather tests before I buy anything.",
+    ],
+    risk: [
+      { riskTitle: "Avg. Sentiment",
+        riskDescription: "+68% positive"
+      },
+      {
+        riskTitle: "Risk Band",
+        riskDescription: "Low"
+      }
     ],
     videos: [
       { title: "3-day loop with a 9lb pack", views: "2.1M views", img: "/images/trail-theory-1.png", link: "https://www.youtube.com/watch?v=w6FylJ9I7M8" },
@@ -50,6 +65,16 @@ const creators: ContentCreator[] = [
     commentVolume30d: 7600,
     sentiment: { positive: 64, neutral: 28, negative: 8 },
     topThemes: ["coffee recipes", "budget gear", "beginner routes"],
+    risk: [
+      {
+        riskTitle: "Avg. Sentiment",
+        riskDescription: "+64% positive"
+      },
+      {
+        riskTitle: "Risk Band",
+        riskDescription: "Low"
+      }
+    ],
     highlightedComments: [
       "Love that you include brew temps—helps me replicate the coffee on trail!",
       "Please keep the under-$50 gear recs coming, super helpful.",
@@ -76,6 +101,16 @@ const creators: ContentCreator[] = [
       "Maps + prices in the description are clutch for planning trips.",
       "Thanks for including veggie options—super helpful.",
     ],
+    risk: [
+      {
+        riskTitle: "Avg. Sentiment",
+        riskDescription: "+69% positive"
+      },
+      {
+        riskTitle: "Risk Band",
+        riskDescription: "Low"
+      }
+    ],
     videos: [
       { title: "72 hours eating Lisbon", views: "1.1M views", img: "/images/metro-bites-1.jpg", link: "/videos/metro-bites-1" },
       { title: "Late-night kebabs in Berlin", views: "870k views", img: "/images/metro-bites-2.jpg", link: "/videos/metro-bites-2" },
@@ -97,6 +132,16 @@ const creators: ContentCreator[] = [
     highlightedComments: [
       "These aerial routes made my Seoul trip—followed them step for step!",
       "Please keep adding transit notes, super helpful at night.",
+    ],
+    risk: [
+      {
+        riskTitle: "Avg. Sentiment",
+        riskDescription: "+73% positive"
+      },
+      {
+        riskTitle: "Risk Band",
+        riskDescription: "Low"
+      }
     ],
     videos: [
       { title: "Seoul night markets from above", views: "2.4M views", img: "/images/signal-skyline-1.jpg", link: "/videos/signal-skyline-1" },
@@ -120,6 +165,16 @@ const creators: ContentCreator[] = [
       "Finally someone measures fit + straps for smaller frames—instant subscribe.",
       "Compression cube tests were more helpful than most blog posts.",
     ],
+    risk: [
+      {
+        riskTitle: "Avg. Sentiment",
+        riskDescription: "+61% positive"
+      },
+      {
+        riskTitle: "Risk Band",
+        riskDescription: "Low"
+      }
+    ],
     videos: [
       { title: "Backpack stress test: 7 brands", views: "360k views", img: "/images/carry-on-lab-1.jpg", link: "/videos/carry-on-lab-1" },
       { title: "Capsule wardrobe for 10 days", views: "290k views", img: "/images/carry-on-lab-2.jpg", link: "/videos/carry-on-lab-2" },
@@ -141,6 +196,16 @@ const creators: ContentCreator[] = [
     highlightedComments: [
       "Appreciate the ferry schedules + budget hotels in one place—saved so much time.",
       "Clear on surf seasons; helped me move my trip earlier.",
+    ],
+    risk: [
+      {
+        riskTitle: "Avg. Sentiment",
+        riskDescription: "+67% positive"
+      },
+      {
+        riskTitle: "Risk Band",
+        riskDescription: "Low"
+      }
     ],
     videos: [
       { title: "Island-hop Japan by ferry", views: "780k views", img: "/images/coastal-signals-1.jpg", link: "/videos/coastal-signals-1" },
@@ -212,10 +277,9 @@ export default async function CreatorDetailPage({ params }: Params) {
             <p className="text-sm text-gray-400">Last 12 months of safety signals.</p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <MetricCard label="Brand safety score" value="92 / 100" />
-            <MetricCard label="Disclosure incidents" value="0 in past 12 mo" />
-            <MetricCard label="Avg. sentiment" value="+68% positive" />
-            <MetricCard label="Risk band" value="Low" />
+            {creator.risk.map((risk) => (
+              <MetricCard key={risk.riskTitle} label={risk.riskTitle} value={risk.riskDescription} />
+            ))}
           </div>
         </section>
 
@@ -296,7 +360,7 @@ export default async function CreatorDetailPage({ params }: Params) {
           </div>
         </section>
 
-        <section className="rounded-2xl border border-white/10 bg-white/5 p-6 shadow-inner shadow-black/30 space-y-3">
+        {/* <section className="rounded-2xl border border-white/10 bg-white/5 p-6 shadow-inner shadow-black/30 space-y-3">
           <h3 className="text-sm uppercase tracking-[0.25em] text-gray-400">Collaboration notes</h3>
           <p className="text-gray-200 text-sm">
             This creator demonstrates consistent disclosure, steady month-over-month growth, and strong engagement within their niche.
@@ -307,7 +371,8 @@ export default async function CreatorDetailPage({ params }: Params) {
             <span className="rounded-full bg-white/10 px-3 py-1">Formats: long + short</span>
             <span className="rounded-full bg-white/10 px-3 py-1">Requests: open</span>
           </div>
-        </section>
+        </section> */}
+        
       </div>
     </div>
   )

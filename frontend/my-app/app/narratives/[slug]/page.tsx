@@ -38,9 +38,14 @@ type NarrativeDetail = {
   sentimentScore: string
   velocity: string
   sentiment: "positive" | "neutral" | "negative"
-  topCreators: string[]
+  topCreators: Creator[]
   claims: Claim[]
   videos: VideoDetail[]
+}
+
+type Creator = {
+  name: string
+  slug: string
 }
 
 const narratives: NarrativeDetail[] = [
@@ -55,7 +60,14 @@ const narratives: NarrativeDetail[] = [
     sentimentScore: "82% positive",
     velocity: "+18% week-over-week",
     sentiment: "positive",
-    topCreators: ["NomadNick", "WonderWithMia", "TravelTomo", "WanderNina", "RailRiderKen", "AutumnAtlas"],
+    topCreators: [
+      { name: "Trail Theory", slug: "trail-theory" },
+      { name: "WonderWithMia", slug: "wonder-with-mia" },
+      { name: "TravelTomo", slug: "travel-tomo" },
+      { name: "WanderNina", slug: "wander-nina" },
+      { name: "RailRiderKen", slug: "rail-rider-ken" },
+      { name: "AutumnAtlas", slug: "autumn-atlas" }
+    ],
     claims: [
       { text: "Rural rail passes are cheaper than city subway passes over 5+ days.", source: "NomadNick", views: "1.2M", engagement: "11.2%", growth: "+42%" },
       { text: "You can eat in small-town izakayas for under $10 a meal.", source: "WonderWithMia", views: "842K", engagement: "9.8%", growth: "+37%" },
@@ -136,7 +148,13 @@ const narratives: NarrativeDetail[] = [
     sentimentScore: "76% positive",
     velocity: "+11% week-over-week",
     sentiment: "positive",
-    topCreators: ["PocketPorto", "EuroNomad", "SailWithSami", "BudgetBalearic", "CoastlineKate"],
+    topCreators: [
+      { name: "PocketPorto", slug: "pocket-port" },
+      { name: "EuroNomad", slug: "euro-nomad" },
+      { name: "SailWithSami", slug: "sail-with-sami" },
+      { name: "BudgetBalearic", slug: "budget-balearic" },
+      { name: "CoastlineKate", slug: "coastline-kate" }
+    ],
     claims: [
       { text: "Sea temps in October stay swimmable from Lisbon to Malta.", source: "SailWithSami", views: "410K", engagement: "6.9%", growth: "+12%" },
       { text: "Bundle ferry + train passes cut island-hop costs by ~20%.", source: "PocketPorto", views: "355K", engagement: "7.2%", growth: "+15%" },
@@ -201,7 +219,13 @@ const narratives: NarrativeDetail[] = [
     sentimentScore: "64% positive / neutral skew",
     velocity: "+6% week-over-week",
     sentiment: "neutral",
-    topCreators: ["NomadNora", "ChilangoCheck", "DataDriftCDMX", "LateNightLeo", "MetroMaven"],
+    topCreators: [
+      { name: "NomadNora", slug: "nomad-nora" },
+      { name: "ChilangoCheck", slug: "chilango-check" },
+      { name: "DataDriftCDMX", slug: "data-drift-cdmx" },
+      { name: "LateNightLeo", slug: "late-night-leo" },
+      { name: "MetroMaven", slug: "metro-maven" }
+    ],
     claims: [
       { text: "Ride-hail costs ~$5 USD cross-city after 11pm vs. $2 metro.", source: "ChilangoCheck", views: "288K", engagement: "6.1%", growth: "+9%" },
       { text: "Pickpocketing most common on Line 3 and 5 during rush hour.", source: "DataDriftCDMX", views: "331K", engagement: "7.8%", growth: "+14%" },
@@ -266,7 +290,13 @@ const narratives: NarrativeDetail[] = [
     sentimentScore: "79% positive",
     velocity: "+14% week-over-week",
     sentiment: "positive",
-    topCreators: ["VanVidaLena", "RoadsAndRila", "NomadNorthStar", "BalkanBreeze", "CampWithKai"],
+    topCreators: [
+      { name: "VanVidaLena", slug: "van-vida-lena" },
+      { name: "RoadsAndRila", slug: "roads-and-rila" },
+      { name: "NomadNorthStar", slug: "nomad-north-star" },
+      { name: "BalkanBreeze", slug: "balkan-breeze" },
+      { name: "CampWithKai", slug: "camp-with-kai" }
+    ],
     claims: [
       { text: "Cross-border car rentals cost ~€10/day more; pick up/drop in same country to save.", source: "VanVidaLena", views: "189K", engagement: "6.4%", growth: "+12%" },
       { text: "Kotor to Ohrid loop is doable in 6 days with two ferries.", source: "RoadsAndRila", views: "143K", engagement: "5.9%", growth: "+10%" },
@@ -331,7 +361,13 @@ const narratives: NarrativeDetail[] = [
     sentimentScore: "88% positive",
     velocity: "+21% week-over-week",
     sentiment: "positive",
-    topCreators: ["SeoulSnacks", "KWaveKait", "TransitTae", "MidnightMandu", "MerchMapMae"],
+    topCreators: [
+      { name: "SeoulSnacks", slug: "seoul-snacks" },
+      { name: "KWaveKait", slug: "k-wave-kait" },
+      { name: "TransitTae", slug: "transit-tae" },
+      { name: "MidnightMandu", slug: "midnight-mandu" },
+      { name: "MerchMapMae", slug: "merch-map-mae" }
+    ],
     claims: [
       { text: "Myeongdong street food peaks 9–11pm; lines drop after 11:15pm.", source: "SeoulSnacks", views: "710K", engagement: "10.2%", growth: "+24%" },
       { text: "Hongdae merch streets stay open past midnight on weekends.", source: "KWaveKait", views: "654K", engagement: "9.4%", growth: "+20%" },
@@ -396,7 +432,13 @@ const narratives: NarrativeDetail[] = [
     sentimentScore: "73% positive",
     velocity: "+9% week-over-week",
     sentiment: "positive",
-    topCreators: ["TrailTessa", "FrostyFootprints", "PeakPixel", "SummitSage", "NationalNora"],
+    topCreators: [
+      {name: "TrailTessa", slug: "trail-tessa"},
+      {name: "FrostyFootprints", slug: "frosty-footprints"},
+      {name: "PeakPixel", slug: "peak-pixel"},
+      {name: "SummitSage", slug: "summit-sage"},
+      {name: "NationalNora", slug: "national-nora"}
+    ],
     claims: [
       { text: "Zion shuttle is off in winter; personal cars allowed most days.", source: "TrailTessa", views: "211K", engagement: "6.7%", growth: "+11%" },
       { text: "Yellowstone thermal basins are open via snowcoach; book 4+ weeks early.", source: "FrostyFootprints", views: "167K", engagement: "6.2%", growth: "+10%" },
@@ -514,9 +556,11 @@ export default async function NarrativeDetailPage({ params }: Params) {
           </div>
           <div className="flex flex-wrap gap-2">
             {narrative.topCreators.map((creator) => (
-              <span key={creator} className="rounded-full bg-white/5 border border-white/10 px-3 py-2 text-xs text-gray-200">
-                {creator}
-              </span>
+              <Link href={`/creators/${creator.slug}`} key={creator.slug} className="hover:underline hover:underline-offset-4">
+                <span className="rounded-full bg-white/5 border border-white/10 px-3 py-2 text-xs text-gray-200">
+                  {creator.name}
+                </span>
+              </Link>
             ))}
           </div>
         </section>
