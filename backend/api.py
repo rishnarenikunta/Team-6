@@ -154,63 +154,6 @@ def get_destinations(region: str | None = None, tag: str | None = None) -> list[
     return results
 
 
-# ── /api/destinations/{name}  ─────────────────────────────────────────────────
-# Destination detail page — top narrative + all raw claims for that destination
-
-@app.get("/api/destinations/{destination_name}")
-def get_destination(destination_name: str) -> dict[str, Any]:
-
-    # Find top narrative for this destination
-    top = db["top_narratives"].find_one({
-        "destination_id": {"$regex": destination_name, "$options": "i"},
-        "scope_type": "destination",
-        "content_type": "narratives"
-    })
-
-    # Fall back to raw narrative if cluster hasn't run
-    if not top:
-        raw = db["narratives"].find_one(
-            {"destination": {"$regex": destination_name, "$options": "i"}}
-        )
-        if not raw:
-            raise HTTPException(status_code=404, detail="Destination not found")
-        dest_name = raw["destination"]
-        blurb = raw.get("narrative_text", "")
-        cluster_size = None
-        computed_at = None
-        doc_id = str(raw["_id"])
-    else:
-        dest_name = top["destination_id"]
-        blurb = top.get("top_narrative", "")
-        cluster_size = top.get("cluster_size")
-        computed_at = top["computed_at"].isoformat() if top.get("computed_at") else None
-        doc_id = str(top["_id"])
-
-    # Get all claims for this destination
-    claims = list(
-        db["claims"].find(
-            {"destination": dest_name},
-            {"_id": 0, "claim_text": 1, "source": 1, "claim_risk": 1, "date": 1}
-        )
-    )
-
-    # Get top claim from cluster results
-    top_claim = db["top_narratives"].find_one({
-        "destination_id": dest_name,
-        "scope_type": "destination",
-        "content_type": "claims"
-    })
-
-    return {
-        "id":            doc_id,
-        "name":          dest_name,
-        "blurb":         blurb,
-        "cluster_size":  cluster_size,
-        "computed_at":   computed_at,
-        "top_claim":     top_claim.get("top_narrative") if top_claim else None,
-        "claims":        claims,
-    }
-
 
 # ── /api/creators  ────────────────────────────────────────────────────────────
 # Returns all creators with their top claim narrative from cluster results
@@ -564,3 +507,61 @@ def get_trending_locations() -> list[dict[str, Any]]:
         })
 
     return results
+
+# ── /api/destinations/{name}  ─────────────────────────────────────────────────
+# Destination detail page — top narrative + all raw claims for that destination
+
+@app.get("/api/destinations/{destination_name}")
+def get_destination(destination_name: str) -> dict[str, Any]:
+
+    # Find top narrative for this destination
+    top = db["top_narratives"].find_one({
+        "destination_id": {"$regex": destination_name, "$options": "i"},
+        "scope_type": "destination",
+        "content_type": "narratives"
+    })
+
+    # Fall back to raw narrative if cluster hasn't run
+    if not top:
+        raw = db["narratives"].find_one(
+            {"destination": {"$regex": destination_name, "$options": "i"}}
+        )
+        if not raw:
+            raise HTTPException(status_code=404, detail="Destination not found")
+        dest_name = raw["destination"]
+        blurb = raw.get("narrative_text", "")
+        cluster_size = None
+        computed_at = None
+        doc_id = str(raw["_id"])
+    else:
+        dest_name = top["destination_id"]
+        blurb = top.get("top_narrative", "")
+        cluster_size = top.get("cluster_size")
+        computed_at = top["computed_at"].isoformat() if top.get("computed_at") else None
+        doc_id = str(top["_id"])
+
+    # Get all claims for this destination
+    claims = list(
+        db["claims"].find(
+            {"destination": dest_name},
+            {"_id": 0, "claim_text": 1, "source": 1, "claim_risk": 1, "date": 1}
+        )
+    )
+
+    # Get top claim from cluster results
+    top_claim = db["top_narratives"].find_one({
+        "destination_id": dest_name,
+        "scope_type": "destination",
+        "content_type": "claims"
+    })
+
+    return {
+        "id":            doc_id,
+        "name":          dest_name,
+        "blurb":         blurb,
+        "cluster_size":  cluster_size,
+        "computed_at":   computed_at,
+        "top_claim":     top_claim.get("top_narrative") if top_claim else None,
+        "claims":        claims,
+    }
+
