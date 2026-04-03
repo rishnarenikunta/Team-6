@@ -24,7 +24,7 @@ export default function TrendingLocations() {
   const [activeCountry, setActiveCountry] = useState<string | null>("Japan");
 
   return (
-    <div className="w-full h-dvh pt-8 px-8">
+    <div className="w-full h-full pt-8 px-8">
     <h2 className="text-2xl font-semibold text-white tracking-tight mb-2">
         Destination Trend Graph
       </h2>
