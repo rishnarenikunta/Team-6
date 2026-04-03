@@ -37,7 +37,7 @@ export default function TrendingTopics() {
         {displayedTopics.map((topic) => (
           <button
             key={topic}
-            onClick={() => router.push(`/discover/${topic}`)}
+            onClick={() => router.push(`/discover/${String(topic || "").toLowerCase() }`)}
             className="
               rounded-full
               border 

@@ -63,7 +63,14 @@ export default function NewDashboard() {
         </header>
 
         <section className="space-y-3">
-            <form>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                if (searchTerm.trim()) {
+                  router.push(`/discover/${searchTerm.toLowerCase()}`)
+                }
+              }}
+            >
                 <label className="sr-only" htmlFor="discover-search">
                     Search destinations
                 </label>
@@ -91,11 +98,15 @@ export default function NewDashboard() {
                         </span>
                     )}
                     <button
-                        type="button"
-                        className="rounded-xl bg-white/10 px-4 py-2 text-sm font-medium transition hover:bg-white/20"
-                        onClick={() => router.push(`/discover/${searchTerm.toLowerCase()}`)}
+                      type="button"
+                      className="rounded-xl bg-white/10 px-4 py-2 text-sm font-medium transition hover:bg-white/20"
+                      onClick={() => {
+                        if (searchTerm.trim()) {
+                          router.push(`/discover/${searchTerm.toLowerCase()}`)
+                        }
+                      }}
                     >
-                        Search
+                      Search
                     </button>
                     {!searching && matches.length > 0 && (
                         <div className="absolute left-0 top-full mt-2 w-full rounded-xl border border-white/10 bg-[#16161e] shadow-xl backdrop-blur-sm max-h-64 overflow-y-auto z-20">
@@ -104,7 +115,11 @@ export default function NewDashboard() {
                                 return (
                                     <button
                                         key={dest.id ?? name}
-                                        onMouseDown={() => router.push(`/discover/${encodeURIComponent(name.toLowerCase())}`)}
+                                        type="button"
+                                        onMouseDown={(e) => {
+                                          e.preventDefault()
+                                          router.push(`/discover/${encodeURIComponent(name.toLowerCase())}`)
+                                        }}
                                         className="w-full text-left px-4 py-3 hover:bg-white/10 transition"
                                     >
                                         <p className="text-sm text-white">{name}</p>
