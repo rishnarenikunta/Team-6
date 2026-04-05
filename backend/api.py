@@ -31,6 +31,179 @@ def make_slug(text: str) -> str:
 
 # ── /api/claims/trending ──────────────────────────────────────────────────────
 # Returns top claims per destination from the top_narratives cluster results
+from datetime import datetime, timedelta
+
+# api/creators/page
+
+@app.get("/api/creators/page")
+def get_creators_page() -> list[dict[str, Any]]:
+    """
+    Creators list view for creators/page.tsx.
+
+    Returns an array of Creator objects:
+    {
+      slug, name, region, domain, subscribers, monthlyViews,
+      contentType, videos[], commentVolume30d, sentiment, spotlightComment
+    }
+    """
+
+    # 1. Base creators
+    creators = list(db["creators"].find({}))
+
+    # Helper: map channel_id -> metadata docs and video_ids
+    # Fetch all metadata for all these creators in one go
+    channel_ids = [c["channel_id"] for c in creators if "channel_id" in c]
+    metadata_docs = list(
+        db["metadata"].find(
+            {"channel.channel_id": {"$in": channel_ids}}
+        )
+    )
+
+    metadata_by_channel: dict[str, list[dict[str, Any]]] = {}
+    for doc in metadata_docs:
+        ch_id = doc.get("channel", {}).get("channel_id")
+        if not ch_id:
+            continue
+        metadata_by_channel.setdefault(ch_id, []).append(doc)
+
+    # 2. Fetch comments for all those videos (for joins)
+    all_video_ids: list[str] = []
+    for docs in metadata_by_channel.values():
+        for d in docs:
+            vid = d.get("video_id")
+            if vid:
+                all_video_ids.append(vid)
+
+    comments_by_video: dict[str, list[dict[str, Any]]] = {}
+    if all_video_ids:
+        comment_docs = list(
+            db["comments"].find(
+                {"video_id": {"$in": all_video_ids}},
+                {"_id": 0, "video_id": 1, "text": 1, "like_count": 1, "timestamp": 1}
+            )
+        )
+        for c in comment_docs:
+            vid = c.get("video_id")
+            if not vid:
+                continue
+            comments_by_video.setdefault(vid, []).append(c)
+
+    now_ts = int(datetime.utcnow().timestamp())
+    thirty_days_ago_ts = now_ts - int(timedelta(days=30).total_seconds())
+
+    results: list[dict[str, Any]] = []
+
+    for creator in creators:
+        channel_id = creator.get("channel_id")
+        if not channel_id:
+            continue
+
+        # ----- slug -----
+        handle = creator.get("handle")  # e.g. "@iJustine"
+        if handle and isinstance(handle, str) and handle.startswith("@"):
+            slug = handle[1:].lower()
+        elif handle and isinstance(handle, str):
+            slug = handle.lower()
+        else:
+            slug = channel_id.lower()
+
+        # ----- videos & monthly views -----
+        creator_metadata = metadata_by_channel.get(channel_id, [])
+        videos: list[dict[str, Any]] = []
+        monthly_views_total = 0
+
+        creator_video_ids: list[str] = []
+
+        for doc in creator_metadata:
+            video_id = doc.get("video_id")
+            if video_id:
+                creator_video_ids.append(video_id)
+
+            stats = doc.get("stats", {}) or {}
+            view_count = stats.get("view_count", 0) or 0
+            monthly_views_total += view_count
+
+            videos.append({
+                "title": doc.get("title", ""),
+                "img": "",  # no thumbnail field shown in schema; fill later if added
+                "link": doc.get("webpage_url", ""),
+            })
+
+        # ----- comments: commentVolume30d & spotlightComment -----
+        comment_volume_30d = 0
+        spotlight_comment = ""
+
+        # Gather all comments for this creator's videos
+        creator_comments: list[dict[str, Any]] = []
+        for vid in creator_video_ids:
+            creator_comments.extend(comments_by_video.get(vid, []))
+
+        # Count last 30 days and pick top-liked recent comment
+        best_comment = None
+        best_likes = -1
+
+        for c in creator_comments:
+            ts = c.get("timestamp")
+            if isinstance(ts, (int, float)):
+                if ts >= thirty_days_ago_ts:
+                    comment_volume_30d += 1
+                    likes = c.get("like_count", 0) or 0
+                    if likes > best_likes and c.get("text"):
+                        best_likes = likes
+                        best_comment = c
+
+        if best_comment and best_comment.get("text"):
+            spotlight_comment = best_comment["text"]
+
+        # ----- sentiment placeholder -----
+        sentiment = {
+            "positive": 0,
+            "neutral": 100,
+            "negative": 0,
+        }
+
+        # ----- region & domain -----
+        category = creator.get("category", "")  # e.g. "Tech", "Travel & Events"
+        domain = category or ""
+
+        # Simple region heuristic placeholder (can be replaced with real mapping)
+        region = "Americas"
+
+        # contentType must match your union: "Travel" | "Food" | ...
+        # Map from category to one of those; default to "Travel".
+        content_type = "Travel"
+        if isinstance(category, str):
+            lower_cat = category.lower()
+            if "tech" in lower_cat:
+                content_type = "Tech"
+            elif "news" in lower_cat:
+                content_type = "News"
+            elif "food" in lower_cat:
+                content_type = "Food"
+            elif "entertain" in lower_cat:
+                content_type = "Entertainment"
+            elif "vlog" in lower_cat or "lifestyle" in lower_cat:
+                content_type = "Lifestyle/Vlog"
+            elif "wellness" in lower_cat or "health" in lower_cat:
+                content_type = "Wellness"
+            elif "travel" in lower_cat:
+                content_type = "Travel"
+
+        results.append({
+            "slug": slug,
+            "name": creator.get("name", ""),
+            "region": region,
+            "domain": domain,
+            "subscribers": creator.get("subscriber_count", 0) or 0,
+            "monthlyViews": monthly_views_total,
+            "contentType": content_type,
+            "videos": videos,
+            "commentVolume30d": comment_volume_30d,
+            "sentiment": sentiment,
+            "spotlightComment": spotlight_comment,
+        })
+
+    return results
 
 @app.get("/api/claims/trending")
 def get_trending_claims() -> list[dict[str, Any]]:
@@ -399,179 +572,7 @@ def get_creator_page(slug: str) -> dict[str, Any]:
     }
 
 
-from datetime import datetime, timedelta
 
-# api/creators/page
-
-@app.get("/api/creators/page")
-def get_creators_page() -> list[dict[str, Any]]:
-    """
-    Creators list view for creators/page.tsx.
-
-    Returns an array of Creator objects:
-    {
-      slug, name, region, domain, subscribers, monthlyViews,
-      contentType, videos[], commentVolume30d, sentiment, spotlightComment
-    }
-    """
-
-    # 1. Base creators
-    creators = list(db["creators"].find({}))
-
-    # Helper: map channel_id -> metadata docs and video_ids
-    # Fetch all metadata for all these creators in one go
-    channel_ids = [c["channel_id"] for c in creators if "channel_id" in c]
-    metadata_docs = list(
-        db["metadata"].find(
-            {"channel.channel_id": {"$in": channel_ids}}
-        )
-    )
-
-    metadata_by_channel: dict[str, list[dict[str, Any]]] = {}
-    for doc in metadata_docs:
-        ch_id = doc.get("channel", {}).get("channel_id")
-        if not ch_id:
-            continue
-        metadata_by_channel.setdefault(ch_id, []).append(doc)
-
-    # 2. Fetch comments for all those videos (for joins)
-    all_video_ids: list[str] = []
-    for docs in metadata_by_channel.values():
-        for d in docs:
-            vid = d.get("video_id")
-            if vid:
-                all_video_ids.append(vid)
-
-    comments_by_video: dict[str, list[dict[str, Any]]] = {}
-    if all_video_ids:
-        comment_docs = list(
-            db["comments"].find(
-                {"video_id": {"$in": all_video_ids}},
-                {"_id": 0, "video_id": 1, "text": 1, "like_count": 1, "timestamp": 1}
-            )
-        )
-        for c in comment_docs:
-            vid = c.get("video_id")
-            if not vid:
-                continue
-            comments_by_video.setdefault(vid, []).append(c)
-
-    now_ts = int(datetime.utcnow().timestamp())
-    thirty_days_ago_ts = now_ts - int(timedelta(days=30).total_seconds())
-
-    results: list[dict[str, Any]] = []
-
-    for creator in creators:
-        channel_id = creator.get("channel_id")
-        if not channel_id:
-            continue
-
-        # ----- slug -----
-        handle = creator.get("handle")  # e.g. "@iJustine"
-        if handle and isinstance(handle, str) and handle.startswith("@"):
-            slug = handle[1:].lower()
-        elif handle and isinstance(handle, str):
-            slug = handle.lower()
-        else:
-            slug = channel_id.lower()
-
-        # ----- videos & monthly views -----
-        creator_metadata = metadata_by_channel.get(channel_id, [])
-        videos: list[dict[str, Any]] = []
-        monthly_views_total = 0
-
-        creator_video_ids: list[str] = []
-
-        for doc in creator_metadata:
-            video_id = doc.get("video_id")
-            if video_id:
-                creator_video_ids.append(video_id)
-
-            stats = doc.get("stats", {}) or {}
-            view_count = stats.get("view_count", 0) or 0
-            monthly_views_total += view_count
-
-            videos.append({
-                "title": doc.get("title", ""),
-                "img": "",  # no thumbnail field shown in schema; fill later if added
-                "link": doc.get("webpage_url", ""),
-            })
-
-        # ----- comments: commentVolume30d & spotlightComment -----
-        comment_volume_30d = 0
-        spotlight_comment = ""
-
-        # Gather all comments for this creator's videos
-        creator_comments: list[dict[str, Any]] = []
-        for vid in creator_video_ids:
-            creator_comments.extend(comments_by_video.get(vid, []))
-
-        # Count last 30 days and pick top-liked recent comment
-        best_comment = None
-        best_likes = -1
-
-        for c in creator_comments:
-            ts = c.get("timestamp")
-            if isinstance(ts, (int, float)):
-                if ts >= thirty_days_ago_ts:
-                    comment_volume_30d += 1
-                    likes = c.get("like_count", 0) or 0
-                    if likes > best_likes and c.get("text"):
-                        best_likes = likes
-                        best_comment = c
-
-        if best_comment and best_comment.get("text"):
-            spotlight_comment = best_comment["text"]
-
-        # ----- sentiment placeholder -----
-        sentiment = {
-            "positive": 0,
-            "neutral": 100,
-            "negative": 0,
-        }
-
-        # ----- region & domain -----
-        category = creator.get("category", "")  # e.g. "Tech", "Travel & Events"
-        domain = category or ""
-
-        # Simple region heuristic placeholder (can be replaced with real mapping)
-        region = "Americas"
-
-        # contentType must match your union: "Travel" | "Food" | ...
-        # Map from category to one of those; default to "Travel".
-        content_type = "Travel"
-        if isinstance(category, str):
-            lower_cat = category.lower()
-            if "tech" in lower_cat:
-                content_type = "Tech"
-            elif "news" in lower_cat:
-                content_type = "News"
-            elif "food" in lower_cat:
-                content_type = "Food"
-            elif "entertain" in lower_cat:
-                content_type = "Entertainment"
-            elif "vlog" in lower_cat or "lifestyle" in lower_cat:
-                content_type = "Lifestyle/Vlog"
-            elif "wellness" in lower_cat or "health" in lower_cat:
-                content_type = "Wellness"
-            elif "travel" in lower_cat:
-                content_type = "Travel"
-
-        results.append({
-            "slug": slug,
-            "name": creator.get("name", ""),
-            "region": region,
-            "domain": domain,
-            "subscribers": creator.get("subscriber_count", 0) or 0,
-            "monthlyViews": monthly_views_total,
-            "contentType": content_type,
-            "videos": videos,
-            "commentVolume30d": comment_volume_30d,
-            "sentiment": sentiment,
-            "spotlightComment": spotlight_comment,
-        })
-
-    return results
 
 from datetime import datetime, timezone
 from typing import Any, Dict, List
@@ -982,7 +983,7 @@ def get_narratives_index() -> List[Dict[str, Any]]:
         results.append({
             "slug": slug,
             "title": title,
-            "region": region
+            "region": region,
             "sentiment": sentiment,
             "velocity": velocity,
             "creators": creators_str,
