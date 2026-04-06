@@ -466,22 +466,27 @@ if __name__ == "__main__":
     # 2. Extract some metadata
     video_id = mongo_doc.get("_id", "Unknown")
     gcs_transcript_path = mongo_doc.get("gcs_transcript_path")
-    channel_id = mongo_doc.get("channel_id")
-    
+    channel_id = mongo_doc.get("channel_id") || mongo_doc.get("channel").get("channel_id")
     # --- Fetch Channel Title from Creators Collection ---
     channel_title = "Unknown Channel"
     if db is not None and channel_id:
         creator = db["creators"].find_one({"channel_id": channel_id})
         if creator and "name" in creator:
             channel_title = creator["name"]
-    
     tags = mongo_doc.get("tags", [])
     title = mongo_doc.get("title")
-    top_comments = [
-        "Loved the scenes from Paris!",
-        "Germany looked incredible.",
-        "Please visit Spain next time!",
-    ]
+    # --- Fetch Comments from Comments Collection ---
+    top_comments = []
+    if db is not None and video_id != "Unknown":
+        # Query comments matching this video_id, limit to 50 to save context window space
+        comments_cursor = db["comments"].find({"video_id": video_id}).limit(50)
+        for comment_doc in comments_cursor:
+            comment_text = comment_doc.get("text")
+            if comment_text:
+                top_comments.append(comment_text)
+    # Fallback if no comments were found in the DB
+    if not top_comments:
+        top_comments = ["No comments available."]
     upload_date = mongo_doc.get("upload_date")
 
     # 3. Fetch transcript from GCS
