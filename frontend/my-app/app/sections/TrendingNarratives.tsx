@@ -36,6 +36,18 @@ export default function TrendingNarratives() {
     fetchNarratives();
   }, []);
 
+  // only display narratives with a destination and text and only the top 10 or min(narratives.length, 10 and unique text
+  const filteredNarratives = narratives.filter(narrative => narrative.destination && narrative.text);
+  const uniqueNarrativesMap = new Map<string, Narrative>();
+  filteredNarratives.forEach(narrative => {
+    if (!uniqueNarrativesMap.has(narrative.text)) {
+      uniqueNarrativesMap.set(narrative.text, narrative);
+    }
+  });
+  const uniqueNarratives = Array.from(uniqueNarrativesMap.values());
+  const displayedNarratives = uniqueNarratives.slice(0, 6);
+
+
   return (
     <div className="w-full mt-10 h-fit mb-50">
       <h2 className="text-2xl font-semibold text-white tracking-tight mb-2">
@@ -46,11 +58,11 @@ export default function TrendingNarratives() {
 
         {/* LEFT SIDE LIST */}
         <div className="flex flex-col gap-4 w-1/2 mt-8">
-          {narratives.map((item) => (
+          {displayedNarratives.map((item) => (
             <motion.p
               key={item.id}
               onClick={() => setSelected(item)}
-              className="cursor-pointer text-2xl text-gray-300 hover:text-purple-300 transition pl-5"
+              className="cursor-pointer text-md text-gray-300 hover:text-purple-300 transition pl-5 mr-5"
               whileHover={{ x: 5 }}
             >
               "{item.text}"

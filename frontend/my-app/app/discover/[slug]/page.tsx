@@ -13,6 +13,7 @@ type Destination = {
   claims: number
   creators: number
   spotlight: {
+    slug: string
     name: string
     avatar: string
     subs: string
@@ -44,9 +45,9 @@ const destinations: Destination[] = [
     claims: 22,
     creators: 74,
     spotlight: [
-      { name: "NomadNick", avatar: "https://i.pravatar.cc/120?img=14", subs: "1.1M subs", uploads: "3 vids/week", focus: "Food + rail passes" },
-      { name: "WonderWithMia", avatar: "https://i.pravatar.cc/120?img=32", subs: "840K subs", uploads: "2 vids/week", focus: "Izakaya hunts, autumn routes" },
-      { name: "RailRiderKen", avatar: "https://i.pravatar.cc/120?img=55", subs: "410K subs", uploads: "1 vid/week", focus: "Regional passes & timetables" },
+      { slug: "nomadnick", name: "NomadNick", avatar: "https://i.pravatar.cc/120?img=14", subs: "1.1M subs", uploads: "3 vids/week", focus: "Food + rail passes" },
+      { slug: "trail-theory", name: "WonderWithMia", avatar: "https://i.pravatar.cc/120?img=32", subs: "840K subs", uploads: "2 vids/week", focus: "Izakaya hunts, autumn routes" },
+      { slug: "railriderken", name: "RailRiderKen", avatar: "https://i.pravatar.cc/120?img=55", subs: "410K subs", uploads: "1 vid/week", focus: "Regional passes & timetables" },
     ],
     topNarratives: [
       { title: "Slow travel in Japan’s countryside", slug: "slow-travel-japan-countryside", sentiment: "positive", velocity: "+18% WoW", blurb: "Rural rail loops, farm-stays, onsen towns beat city rush." },
@@ -68,9 +69,9 @@ const destinations: Destination[] = [
     claims: 18,
     creators: 58,
     spotlight: [
-      { name: "PocketPorto", avatar: "https://i.pravatar.cc/120?img=5", subs: "320K subs", uploads: "2 vids/week", focus: "Budget coastal stays" },
-      { name: "CoastlineKate", avatar: "https://i.pravatar.cc/120?img=8", subs: "510K subs", uploads: "1–2 vids/week", focus: "Surf day-trips & ferries" },
-      { name: "EuroNomad", avatar: "https://i.pravatar.cc/120?img=61", subs: "760K subs", uploads: "weekly", focus: "Shoulder-season itineraries" },
+      { slug: "pocketporto", name: "PocketPorto", avatar: "https://i.pravatar.cc/120?img=5", subs: "320K subs", uploads: "2 vids/week", focus: "Budget coastal stays" },
+      { slug: "coastlinekate", name: "CoastlineKate", avatar: "https://i.pravatar.cc/120?img=8", subs: "510K subs", uploads: "1–2 vids/week", focus: "Surf day-trips & ferries" },
+      { slug: "euronomad", name: "EuroNomad", avatar: "https://i.pravatar.cc/120?img=61", subs: "760K subs", uploads: "weekly", focus: "Shoulder-season itineraries" },
     ],
     topNarratives: [
       { title: "Mediterranean shoulder-season hack", slug: "mediterranean-shoulder-season-hack", sentiment: "positive", velocity: "+11% WoW", blurb: "Crowd-free coastal trips in Oct/Nov with cheaper stays." },
@@ -92,9 +93,9 @@ const destinations: Destination[] = [
     claims: 25,
     creators: 92,
     spotlight: [
-      { name: "ChilangoCheck", avatar: "https://i.pravatar.cc/120?img=21", subs: "290K subs", uploads: "2 vids/week", focus: "Safety walkthroughs" },
-      { name: "NomadNora", avatar: "https://i.pravatar.cc/120?img=44", subs: "610K subs", uploads: "weekly", focus: "Neighborhood guides" },
-      { name: "DataDriftCDMX", avatar: "https://i.pravatar.cc/120?img=71", subs: "180K subs", uploads: "biweekly", focus: "Data-led metro tips" },
+      { slug: "chilangocheck", name: "ChilangoCheck", avatar: "https://i.pravatar.cc/120?img=21", subs: "290K subs", uploads: "2 vids/week", focus: "Safety walkthroughs" },
+      { slug: "nomadnora", name: "NomadNora", avatar: "https://i.pravatar.cc/120?img=44", subs: "610K subs", uploads: "weekly", focus: "Neighborhood guides" },
+      { slug: "datadriftcdmx", name: "DataDriftCDMX", avatar: "https://i.pravatar.cc/120?img=71", subs: "180K subs", uploads: "biweekly", focus: "Data-led metro tips" },
     ],
     topNarratives: [
       { title: "Mexico City safety discourse", slug: "mexico-city-safety-discourse", sentiment: "neutral", velocity: "+6% WoW", blurb: "Night transit, neighborhood debates, rideshare vs metro." },
@@ -116,9 +117,9 @@ const destinations: Destination[] = [
     claims: 27,
     creators: 105,
     spotlight: [
-      { name: "SeoulSnacks", avatar: "https://i.pravatar.cc/120?img=53", subs: "920K subs", uploads: "2–3 vids/week", focus: "Night markets" },
-      { name: "KWaveKait", avatar: "https://i.pravatar.cc/120?img=46", subs: "1.3M subs", uploads: "weekly", focus: "Merch & concerts" },
-      { name: "TransitTae", avatar: "https://i.pravatar.cc/120?img=29", subs: "480K subs", uploads: "weekly", focus: "Late-night transit" },
+      { slug: "seoulsnacks", name: "SeoulSnacks", avatar: "https://i.pravatar.cc/120?img=53", subs: "920K subs", uploads: "2–3 vids/week", focus: "Night markets" },
+      { slug: "kwavekait", name: "KWaveKait", avatar: "https://i.pravatar.cc/120?img=46", subs: "1.3M subs", uploads: "weekly", focus: "Merch & concerts" },
+      { slug: "transittae", name: "TransitTae", avatar: "https://i.pravatar.cc/120?img=29", subs: "480K subs", uploads: "weekly", focus: "Late-night transit" },
     ],
     topNarratives: [
       { title: "Seoul night markets & K-pop pilgrimages", slug: "seoul-night-markets-kpop", sentiment: "positive", velocity: "+21% WoW", blurb: "Market hauls, merch streets, concert night transit tips." },
@@ -234,7 +235,9 @@ export default async function DestinationPage({ params }: Params) {
                   className="h-12 w-12 rounded-full border border-white/10 object-cover"
                 />
                 <div className="space-y-1">
-                  <p className="text-sm font-semibold text-white">{creator.name}</p>
+                  <Link href={`/creators/${creator.slug}`}>
+                    <p className="text-sm font-semibold text-white hover:underline">{creator.name}</p>
+                  </Link>
                   <p className="text-xs text-gray-300">{creator.subs} • {creator.uploads}</p>
                   <p className="text-xs text-gray-400">{creator.focus}</p>
                 </div>
