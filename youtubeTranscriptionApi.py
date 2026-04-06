@@ -53,33 +53,21 @@ TRAVEL_KEYWORDS = [
 ]
 
 CHANNEL_BUCKETS: dict[str, list[str]] = {
-    "Travel": [
+     "Travel": [
         "https://www.youtube.com/@fearlessandfar/videos",
         "https://www.youtube.com/@drewbinsky/videos",
-    ],
-    "Food": [
-        "https://www.youtube.com/@FoodNetwork/videos",
-        "https://www.youtube.com/@buzzfeedtasty/videos",
-    ],
-    "Lifestyle/Vlog": [
-        "https://www.youtube.com/@emmachamberlain/videos",
-        "https://www.youtube.com/@casey/videos",
-    ],
-    "Wellness": [
-        "https://www.youtube.com/@bohobeautiful/videos",
-        "https://www.youtube.com/@WildWeRoam/videos",
-    ],
-    "Tech": [
-        "https://www.youtube.com/@iJustine/videos",
-        "https://www.youtube.com/@OneTechTraveller/videos",
-    ],
-    "Entertainment": [
-        "https://www.youtube.com/@Vogue/videos",
-        "https://www.youtube.com/@ELLE/videos",
-    ],
-    "News": [
-        "https://www.youtube.com/@NBCNews/videos",
-        "https://www.youtube.com/@CNN/videos",
+        "https://www.youtube.com/@KenAbroad/videos",
+        "https://www.youtube.com/@SabbaticalTommy/videos",
+        "https://www.youtube.com/@MaxRoving/videos",
+        "https://www.youtube.com/@TheEndlessAdventure/videos",
+        "https://www.youtube.com/@Evazubeck/videos",
+        "https://www.youtube.com/@harryjaggardtravel/videos",
+        "https://www.youtube.com/@lostleblanc/videos",
+        "https://www.youtube.com/@baldandbankrupt/videos",
+        "https://www.youtube.com/@ChrisburkardStudio/videos",
+        "https://www.youtube.com/@Louis/videos",
+        "https://www.youtube.com/@sealontour/videos",
+        "https://www.youtube.com/@TopTravel_YT/videos",
     ],
 }
 
@@ -402,7 +390,7 @@ def try_whisper_next(video_id: str, model: str = "gpt-4o-mini-transcribe") -> Op
             print(f"[WHISPER AUDIO READY] {video_id} mp3={size_mb:.1f}MB")
             text_parts: list[str] = []
 
-            if size_mb > 24:
+            if size_mb > 10:
                 chunks_dir = os.path.join(tmpdir, "chunks")
                 os.makedirs(chunks_dir, exist_ok=True)
                 try:
@@ -450,7 +438,7 @@ def fetch_transcript_text(video_id: str, model: str = "gpt-4o-mini-transcribe") 
     return try_whisper_next(video_id, model=model)
 
 
-def fetch_comments(video_id: str, n: int = 10, timeout_sec: int = 60):
+def fetch_comments(video_id: str, n: int = 10, timeout_sec: int = 600):
     url = f"https://www.youtube.com/watch?v={video_id}"
     cookies = os.getenv("YT_COOKIES_PATH")
     cmd = [
@@ -578,10 +566,7 @@ def get_metadata(video_id: str, gcs_transcript_path: Optional[str] = None):
         "video_id": info.get("id"),
         "title": info.get("title"),
         "channel": {
-            "name": info.get("uploader"),
-            "id": info.get("uploader_id"),
             "channel_id": info.get("channel_id"),
-            "channel_url": info.get("channel_url"),
         },
         "webpage_url": info.get("webpage_url"),
         "duration_seconds": info.get("duration"),
@@ -601,7 +586,7 @@ def get_metadata(video_id: str, gcs_transcript_path: Optional[str] = None):
     return metadata
 
 @app.get("/comments/{video_id}")
-def get_comments(video_id: str, n: int = 10, timeout_sec: int = 300):
+def get_comments(video_id: str, n: int = 10, timeout_sec: int = 600):
     if n < 1 or n > 50:
         raise HTTPException(status_code=400, detail="n must be between 1 and 50")
 
@@ -672,7 +657,7 @@ def top_20_videos_by_bucket_store(
                 time.sleep(1)
 
             scored.sort(key=lambda x: x["score"], reverse=True)
-            top20 = scored[:20]
+            top20 = scored[:25]
 
             stored = []
             for idx, v in enumerate(top20, start=1):
