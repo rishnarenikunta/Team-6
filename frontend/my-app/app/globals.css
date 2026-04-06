@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #b66565;
-  --foreground: #000000;
+  --background: #1e1227;
+  --foreground: #ffffff;
 }
 
 @theme inline {
@@ -14,8 +14,10 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    /* --background: #0b0b0e; */
+    /* bg-gradient-to-b from-[#0b0b0e] via-[#101014] to-[#0b0b0e] */
+    --background: #0b0b0e;
+    --foreground: #ffffff;
   }
 }
 
@@ -33,4 +35,3 @@ body {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
-
