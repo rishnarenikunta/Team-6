@@ -61,7 +61,6 @@ def fetch_transcript_from_gcs(gcs_uri: str) -> str:
 
 def build_country_features(
     title: str,
-    description: str,
     top_comments: List[str],
     transcript: str,
 ) -> str:
@@ -70,7 +69,6 @@ def build_country_features(
     We now use this as part of a richer feature-extraction prompt.
     """
     text = f"Video title: {title}\n\n"
-    text += f"Description:\n{description}\n\n"
     text += "Top comments:\n"
     for i, c in enumerate(top_comments, start=1):
         text += f"{i}. {c}\n"
@@ -107,8 +105,11 @@ class VideoComponents(BaseModel):
     narratives: list[Narrative]
 
 class VideoFeatures(BaseModel):
-    video_components: VideoComponents
-
+    is_travel: bool = Field(
+        description="True if the video is mainly about trips, tourism, or exploring locations. False otherwise."
+    )
+    video_components: Optional[VideoComponents] = None
+    
 # Embedding model for narrative title and claim title
 
 EMBEDDING_MODEL = "models/gemini-embedding-001"  
@@ -136,38 +137,42 @@ def embed_texts(texts: List[str], model: str = EMBEDDING_MODEL) -> List[List[flo
 def extract_video_features_for_video(
     video_id: str,
     title: str,
-    description: str,
     top_comments: List[str],
     transcript: str
 ) -> dict:
 
     features_text = build_country_features(
         title=title,
-        description=description,
         top_comments=top_comments,
         transcript=transcript,
     )
 
     prompt = (
-        "You are an expert video intelligence analyst and trust & safety reviewer. Your task is to analyze the provided Video Transcript, Video Metadata, and Video Comments to extract specific structured insights."
-        "You must strictly base your analysis ONLY on the provided inputs. Do not invent information, guess, or bring in outside knowledge unless performing a basic logical fact-check on a claim made within the video."
-        "\nINPUT DATA:"
-        f"{features_text}"
-        "\nINSTRUCTIONS:\n"
-        "1. Video Summary: Provide a concise, 1-2 sentence summary of what the video is about."
-        # "2. Video Overview: Provide a broader contextual paragraph detailing the video's purpose, tone, and main message based on the metadata and transcript."
-        "2. Destinations: Extract the primary physical countries discussed or visited in the video. Only include those that are a central topic or destination in the video."
-        "3. Overall Comment Analysis: Analyze the comments to determine the overall sentiment "
-        "as a score from 0.0 to 1.0 (0.0 = very negative, 0.5 = neutral, 1.0 = very positive). "
-        "Also identify any general risk callouts (e.g., hate speech, spam, widespread misinformation, dangerous acts)."
-        "4. Narratives & Claims: Break down the transcript into its overarching themes or opinions about the location (Narratives). Under each Narrative, list the specific reasons or features the speaker highlights to prove that point (Claims)."
-        "\n(a) CRITICAL INSTRUCTIONS: DO NOT summarize the plot or recount what the speaker did chronologically (e.g., avoid 'They went to the museum and then ate dinner')."
-        "\n(b) DO extract qualitative judgments and actionable insights (e.g., 'The local food scene is highly accessible for vegans,' supported by claims like 'Every restaurant had plant-based menus')."
-        "5. Risk Assessment Constraint: Whenever you are asked to assess 'risk' (for the overall video, per narrative, or per claim), you MUST derive this risk by combining three factors:"
-        "\na. The sentiment of the comments regarding that specific topic."
-        "\nb. A summary of what the comments are saying about it."
-        "\nc. A logical fact-check of the narrative/claim based on the provided text, search, and basic common sense."
-        "\nOUTPUT FORMAT:\n"
+        "You are an expert video intelligence analyst, content classifier, and trust & safety reviewer. "
+        "Your task is to first classify the provided video, and if applicable, analyze the Transcript, Metadata, and Comments to extract specific structured insights.\n"
+        "You must strictly base your analysis ONLY on the provided inputs. Do not invent information, guess, or bring in outside knowledge unless performing a basic logical fact-check on a claim made within the video.\n\n"
+        "INPUT DATA:\n"
+        f"{features_text}\n\n"
+        "INSTRUCTIONS:\n"
+        "1. Classification (Travel vs. Non-Travel): Determine if this video is a travel video and set the 'is_travel' boolean field accordingly.\n"
+        "   - Definition: A 'Travel' video primarily focuses on visiting, exploring, or documenting places outside the creator’s home location.\n"
+        "   - Examples include: Travel vlogs, tourism guides, city/country exploration, trip itineraries, cultural experiences while traveling, and destination reviews.\n"
+        "   - Non-Travel videos include: General lifestyle vlogs filmed at home, food reviews without travel context, commentary, podcasts, or videos that only briefly mention travel but are not about the trip itself.\n"
+        "   - Rules: Classify based on the MAIN topic of the video, not small mentions. Use the title and transcript as the strongest signals.\n\n"
+        "2. Conditional Extraction: \n"
+        "   - If 'is_travel' is FALSE, you must leave the 'video_components' field empty or null and skip the remaining steps.\n"
+        "   - If 'is_travel' is TRUE, you must extract the following inside the 'video_components' object:\n\n"
+        "   a. Video Summary: Provide a concise, 1-2 sentence summary of what the video is about.\n"
+        "   b. Destinations: Extract the primary physical countries discussed or visited in the video. Only include those that are a central topic or destination.\n"
+        "   c. Overall Comment Analysis: Analyze the comments to determine the overall sentiment as a score from 0.0 to 1.0 (0.0 = very negative, 0.5 = neutral, 1.0 = very positive). Also identify any general risk callouts (e.g., hate speech, spam, widespread misinformation, dangerous acts).\n"
+        "   d. Narratives & Claims: Break down the transcript into its overarching themes or opinions about the location (Narratives). Under each Narrative, list the specific reasons or features the speaker highlights to prove that point (Claims).\n"
+        "      - CRITICAL INSTRUCTION A: DO NOT summarize the plot or recount what the speaker did chronologically (e.g., avoid 'They went to the museum and then ate dinner').\n"
+        "      - CRITICAL INSTRUCTION B: DO extract qualitative judgments and actionable insights (e.g., 'The local food scene is highly accessible for vegans,' supported by claims like 'Every restaurant had plant-based menus').\n"
+        "   e. Risk Assessment Constraint: Whenever you are asked to assess 'risk' (for the overall video, per narrative, or per claim), you MUST derive this risk by combining three factors:\n"
+        "      - The sentiment of the comments regarding that specific topic.\n"
+        "      - A summary of what the comments are saying about it.\n"
+        "      - A logical fact-check of the narrative/claim based on the provided text, search, and basic common sense.\n\n"
+        "OUTPUT FORMAT:\n"
         "You must output your response EXACTLY matching the output JSON structure. Return ONLY valid JSON. Do not include markdown formatting like ```json or any introductory text."
     )
 
@@ -296,70 +301,6 @@ def extract_video_features_for_video(
     except json.JSONDecodeError:
         return default_result
     
-def build_travel_prompt(
-    channel_title: str,
-    tags: List[str],
-    title: str,
-    description: str,
-    top_comments: List[str],
-    transcript: str,
-) -> str:
-    prompt = (
-        "You are labeling a YouTube video as Travel or Non-Travel.\n"
-        "A 'Travel' video is mainly about trips, tourism, vlogs of journeys, "
-        "exploring cities or countries, etc.\n\n"
-        "Return only one word: Travel or Non-Travel.\n\n"
-        f"Channel title: {channel_title}\n"
-        f"Tags: {', '.join(tags)}\n\n"
-        f"Video title: {title}\n"
-        f"Description: {description}\n\n"
-        "Top comments:\n"
-    )
-    for i, c in enumerate(top_comments, start=1):
-        prompt += f"{i}. {c}\n"
-    prompt += "\nTranscript:\n"
-    prompt += transcript[0:5000]
-    return prompt
-
-
-def classify_is_travel_video(
-    video_id: str,
-    channel_title: str,
-    tags: List[str],
-    title: str,
-    description: str,
-    top_comments: List[str],
-    transcript: str
-) -> bool:
-    """
-    Uses Gemini to classify whether a video is a travel video or not.
-    Returns True if Travel, False otherwise.
-    """
-
-    prompt = build_travel_prompt(
-        channel_title=channel_title,
-        tags=tags,
-        title=title,
-        description=description,
-        top_comments=top_comments,
-        transcript=transcript,
-    )
-
-    response = client.models.generate_content(
-        model=GENERATION_MODEL,
-        contents=prompt,
-    )
-
-    raw = (response.text or "").strip().lower()
-    # print("RAW TRAVEL OUTPUT:", raw)  # uncomment for debugging
-
-    # Very simple heuristic based on the expected "Travel" / "Non-Travel" answer
-    if "travel" in raw and "non" not in raw:
-        return True
-    if "non" in raw and "travel" in raw:
-        return False
-    # Fallback: treat unclear answers as Non-Travel
-    return False
 
 def _present(d: dict) -> dict:
     """Strip None values so we never overwrite existing fields with nulls."""
@@ -380,102 +321,125 @@ def save_features_to_collections(db, ctx: dict, features: Dict[str, Any]) -> tup
 
     now = datetime.now(timezone.utc)
     now_str = now.isoformat()
-    vc = features.get("video_components") or {}
+    is_travel = features.get("is_travel")
 
-    video_id = ctx.get("video_id")
-    channel_id = ctx.get("channel_id")
-    upload_date = ctx.get("upload_date")
+    if is_travel:
+        vc = features.get("video_components") or {}
 
-    # 1. Update Videos Collection
-    comment_analysis = vc.get("overall_comment_analysis") or {}
-    videos_col.update_one(
-        {"video_id": video_id},
-        {"$set": _present({
-            "video_id":      video_id,
-            "title":         ctx.get("title"),
-            "description":   ctx.get("description"),
-            "tags":          ctx.get("tags"),
-            "comments":      ctx.get("top_comments"),
-            "summary":       vc.get("video_summary"),
-            "destinations":  vc.get("video_topics_destinations"),
-            "sentiment":     comment_analysis.get("overall_sentiment"),
-            "risk_callouts": comment_analysis.get("general_risk_callouts"),
-            "is_travel":     True,
-            "updated_at":    now,
-        })},
-        upsert=True,
-    )
+        video_id = ctx.get("video_id")
+        channel_id = ctx.get("channel_id")
+        upload_date = ctx.get("upload_date")
 
-    # 2. Update Creators Collection (stub)
-    if channel_id:
-        creators_col.update_one(
-            {"channel_id": channel_id},
-            {"$setOnInsert": _present({
-                "channel_id":    channel_id,
-                "name":          ctx.get("channel_title"),
-                "created_at":    now,
+        # 1. Update Videos Collection
+        comment_analysis = vc.get("overall_comment_analysis") or {}
+        videos_col.update_one(
+            {"video_id": video_id},
+            {"$set": _present({
+                "video_id":      video_id,
+                "title":         ctx.get("title"),
+                "description":   ctx.get("description"),
+                "tags":          ctx.get("tags"),
+                "comments":      ctx.get("top_comments"),
+                "summary":       vc.get("video_summary"),
+                "destinations":  vc.get("video_topics_destinations"),
+                "sentiment":     comment_analysis.get("overall_sentiment"),
+                "risk_callouts": comment_analysis.get("general_risk_callouts"),
+                "is_travel":     True,
+                "updated_at":    now,
             })},
             upsert=True,
         )
 
-    narrative_ids: List[str] = []
-    claim_ids: List[str] = []
+        # 2. Update Creators Collection (stub)
+        if channel_id:
+            creators_col.update_one(
+                {"channel_id": channel_id},
+                {"$setOnInsert": _present({
+                    "channel_id":    channel_id,
+                    "name":          ctx.get("channel_title"),
+                    "created_at":    now,
+                })},
+                upsert=True,
+            )
 
-    destinations = vc.get("video_topics_destinations") or []
-    primary_destination = destinations[0] if destinations else None
+        narrative_ids: List[str] = []
+        claim_ids: List[str] = []
 
-    # 3. Insert Narratives and Claims
-    for narrative in (vc.get("narratives") or []):
-        if not narrative:
-            continue
+        destinations = vc.get("video_topics_destinations") or []
+        primary_destination = destinations[0] if destinations else None
 
-        narrative_id = str(uuid.uuid4())
-        narrative_ids.append(narrative_id)
-
-        narratives_col.insert_one(_present({
-            "narrative_id":     narrative_id,
-            "video_id":         video_id,
-            "channel_id":       channel_id,
-            "narrative_title":  narrative.get("narrative_title"),
-            "narrative_text":   narrative.get("narrative_description"),
-            "narrative_vector": narrative.get("narrative_title_embedding"),
-            "comment_summary":  narrative.get("narrative_comment_summary"),
-            "risk": _present({
-                "sentiment": narrative.get("narrative_comment_risk"),
-                "risk_text":  narrative.get("narrative_comment_risk"),
-            }) or None,
-            "destination":      primary_destination,
-            "date":             now,
-            "upload_date":      upload_date,
-        }))
-
-        for claim in (narrative.get("claims") or []):
-            if not claim:
+        # 3. Insert Narratives and Claims
+        for narrative in (vc.get("narratives") or []):
+            if not narrative:
                 continue
 
-            claim_id = str(uuid.uuid4())
-            claim_ids.append(claim_id)
+            narrative_id = str(uuid.uuid4())
+            narrative_ids.append(narrative_id)
 
-            claims_col.insert_one(_present({
-                "claim_id":     claim_id,
-                "narrative_id": narrative_id,
-                "video_id":     video_id,
-                "claim_title":  claim.get("claim_title"),
-                "claim_text":   claim.get("claim_text"),
-                "claim_vector": claim.get("claim_title_embedding"),
-                "claim_risk":   claim.get("claim_comment_risk"),
-                "fact_check":   claim.get("fact_check_assessment"),
-                "risks": _present({
-                    "sentiment": claim.get("claim_comment_sentiment"),
-                    "risk_text": claim.get("claim_comment_risk"),
+            narratives_col.insert_one(_present({
+                "narrative_id":     narrative_id,
+                "video_id":         video_id,
+                "channel_id":       channel_id,
+                "narrative_title":  narrative.get("narrative_title"),
+                "narrative_text":   narrative.get("narrative_description"),
+                "narrative_vector": narrative.get("narrative_title_embedding"),
+                "comment_summary":  narrative.get("narrative_comment_summary"),
+                "risk": _present({
+                    "sentiment": narrative.get("narrative_comment_risk"),
+                    "risk_text":  narrative.get("narrative_comment_risk"),
                 }) or None,
-                "source":       channel_id,
-                "destination":  primary_destination,
-                "date":         now_str,
-                "upload_date":  upload_date,
+                "destination":      primary_destination,
+                "date":             now,
+                "upload_date":      upload_date,
             }))
 
-    return narrative_ids, claim_ids
+            for claim in (narrative.get("claims") or []):
+                if not claim:
+                    continue
+
+                claim_id = str(uuid.uuid4())
+                claim_ids.append(claim_id)
+
+                claims_col.insert_one(_present({
+                    "claim_id":     claim_id,
+                    "narrative_id": narrative_id,
+                    "video_id":     video_id,
+                    "claim_title":  claim.get("claim_title"),
+                    "claim_text":   claim.get("claim_text"),
+                    "claim_vector": claim.get("claim_title_embedding"),
+                    "claim_risk":   claim.get("claim_comment_risk"),
+                    "fact_check":   claim.get("fact_check_assessment"),
+                    "risks": _present({
+                        "sentiment": claim.get("claim_comment_sentiment"),
+                        "risk_text": claim.get("claim_comment_risk"),
+                    }) or None,
+                    "source":       channel_id,
+                    "destination":  primary_destination,
+                    "date":         now_str,
+                    "upload_date":  upload_date,
+                }))
+
+        return narrative_ids, claim_ids
+    else:
+        video_id = ctx.get("video_id")
+        channel_id = ctx.get("channel_id")
+        upload_date = ctx.get("upload_date")
+
+        # 1. Update Videos Collection
+        videos_col.update_one(
+            {"video_id": video_id},
+            {"$set": _present({
+                "video_id":      video_id,
+                "title":         ctx.get("title"),
+                "description":   ctx.get("description"),
+                "tags":          ctx.get("tags"),
+                "comments":      ctx.get("top_comments"),
+                "is_travel":     False,
+                "updated_at":    now,
+            })},
+            upsert=True,
+        )
+        return [], []
 
 
 if __name__ == "__main__":
@@ -516,66 +480,48 @@ if __name__ == "__main__":
         print(f"[WARN] Transcript is empty for {video_id}. Pipeline may degrade.")
 
     print(f"Starting pipeline for Video ID: {video_id}")
-    # 4. First: classify if it's a travel video
-    is_travel = classify_is_travel_video(
+
+    #this is the features
+    features = extract_video_features_for_video(
         video_id=video_id,
-        channel_title=channel_title,
-        tags=tags,
         title=title,
-        description=description,
         top_comments=top_comments,
         transcript=transcript
     )
-
-    print(f"Is travel video? {is_travel}")
-
-    # 4. If it IS a travel video, extract structured features
-    if is_travel:
-
-        #this is the features
-        features = extract_video_features_for_video(
-            video_id=video_id,
-            title=title,
-            description=description,
-            top_comments=top_comments,
-            transcript=transcript
-        )
-        print("Extracted video features successfully")
-        # --- DATABASE INSERTION ---
-        
-        if MONGODB_URI:
-            try:
-                # Initialize MongoDB Client
-                db_client = MongoClient(MONGODB_URI)
-                db = db_client["travel_app"]
-                
-                # Build context mapping for the save function
-                ctx = {
-                    "video_id": video_id,
-                    "title": title,
-                    "description": description,
-                    "tags": tags,
-                    "top_comments": top_comments,
-                    "channel_id": channel_id,
-                    "channel_title": channel_title,
-                    "upload_date": upload_date,
-                }
-                
-                # Save into the collections
-                n_ids, c_ids = save_features_to_collections(db, ctx, features)
-                print(f"[SUCCESS] Saved to MongoDB. Inserted {len(n_ids)} narratives and {len(c_ids)} claims.")
-            except Exception as e:
-                print(f"[ERROR] Failed to save to MongoDB: {e}")
-        else:
-            print("[WARN] MONGODB_URI not found. Skipping database insertion.")
-        #sanity check for embedding vector shape : PASS
-        # vec = np.array(features["video_components"]["narratives"][0]["claims"][0]["claim_title_embedding"], dtype=float)
-        # print("Dim:", vec.shape[0])
-        # print("Min:", vec.min(), "Max:", vec.max())
-        # print("Norm:", np.linalg.norm(vec))
-        # You can still access just countries with: features["countries"]
+    print("Extracted video features successfully")
+    # --- DATABASE INSERTION ---
+    
+    if MONGODB_URI:
+        try:
+            # Initialize MongoDB Client
+            db_client = MongoClient(MONGODB_URI)
+            db = db_client["travel_app"]
+            
+            # Build context mapping for the save function
+            ctx = {
+                "video_id": video_id,
+                "title": title,
+                "description": description,
+                "tags": tags,
+                "top_comments": top_comments,
+                "channel_id": channel_id,
+                "channel_title": channel_title,
+                "upload_date": upload_date,
+            }
+            
+            # Save into the collections
+            n_ids, c_ids = save_features_to_collections(db, ctx, features)
+            print(f"[SUCCESS] Saved to MongoDB. Inserted {len(n_ids)} narratives and {len(c_ids)} claims.")
+        except Exception as e:
+            print(f"[ERROR] Failed to save to MongoDB: {e}")
     else:
-        print("Not a travel video; skipping feature extraction.")
+        print("[WARN] MONGODB_URI not found. Skipping database insertion.")
+    #sanity check for embedding vector shape : PASS
+    # vec = np.array(features["video_components"]["narratives"][0]["claims"][0]["claim_title_embedding"], dtype=float)
+    # print("Dim:", vec.shape[0])
+    # print("Min:", vec.min(), "Max:", vec.max())
+    # print("Norm:", np.linalg.norm(vec))
+    # You can still access just countries with: features["countries"]
 
 
 # TO DO
