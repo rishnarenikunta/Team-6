@@ -466,7 +466,7 @@ if __name__ == "__main__":
     # 2. Extract some metadata
     video_id = mongo_doc.get("_id", "Unknown")
     gcs_transcript_path = mongo_doc.get("gcs_transcript_path")
-    channel_id = mongo_doc.get("channel_id") || mongo_doc.get("channel").get("channel_id")
+    channel_id = mongo_doc.get("channel_id", mongo_doc.get("channel").get("channel_id"))
     # --- Fetch Channel Title from Creators Collection ---
     channel_title = "Unknown Channel"
     if db is not None and channel_id:
