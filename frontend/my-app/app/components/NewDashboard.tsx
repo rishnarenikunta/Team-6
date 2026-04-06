@@ -47,6 +47,8 @@ export default function NewDashboard() {
       return () => clearTimeout(id)
     }, [API_BASE, searchTerm])
 
+  
+
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#0c0c12] via-[#130f18] to-[#0c0c12] text-white">
