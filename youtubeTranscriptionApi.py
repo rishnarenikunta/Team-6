@@ -672,11 +672,13 @@ def top_20_videos_by_bucket_store(
                     print(f"[TRANSCRIPT OK] {vid}")
                 except Exception as e:
                     print(f"[TRANSCRIPT FAIL] {vid} err={str(e)[:200]}")
+                    continue
 
                 try:
                     get_metadata(vid, gcs_transcript_path=gcs_path)
                 except Exception as e:
                     print(f"[METADATA FAIL] {vid} err={str(e)[:200]}")
+                    continue
 
                 try:
                     get_comments(vid)
