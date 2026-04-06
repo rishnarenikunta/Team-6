@@ -454,19 +454,39 @@ if __name__ == "__main__":
     except json.JSONDecodeError:
         print("[ERROR] MONGO_DOCUMENT is not valid JSON. Exiting.")
         exit(1)
+    # --- Initialize MongoDB ---
+    db = None
+    if MONGODB_URI:
+        try:
+            db_client = MongoClient(MONGODB_URI)
+            db = db_client["travel_app"]
+        except Exception as e:
+            print(f"[ERROR] Failed to connect to MongoDB: {e}")
+
     # 2. Extract some metadata
     video_id = mongo_doc.get("_id", "Unknown")
     gcs_transcript_path = mongo_doc.get("gcs_transcript_path")
-    channel_title = "Example Travel Channel"
-    channel_id = mongo_doc.get("channel_id")
-    tags = ["travel", "vlog", "europe", "vacation"]
+    channel_id = mongo_doc.get("channel_id", mongo_doc.get("channel").get("channel_id"))
+    # --- Fetch Channel Title from Creators Collection ---
+    channel_title = "Unknown Channel"
+    if db is not None and channel_id:
+        creator = db["creators"].find_one({"channel_id": channel_id})
+        if creator and "name" in creator:
+            channel_title = creator["name"]
+    tags = mongo_doc.get("tags", [])
     title = mongo_doc.get("title")
-    description = "In this video I travel through France, Germany, and Italy." # TODO: fade
-    top_comments = [
-        "Loved the scenes from Paris!",
-        "Germany looked incredible.",
-        "Please visit Spain next time!",
-    ]
+    # --- Fetch Comments from Comments Collection ---
+    top_comments = []
+    if db is not None and video_id != "Unknown":
+        # Query comments matching this video_id, limit to 50 to save context window space
+        comments_cursor = db["comments"].find({"video_id": video_id}).limit(50)
+        for comment_doc in comments_cursor:
+            comment_text = comment_doc.get("text")
+            if comment_text:
+                top_comments.append(comment_text)
+    # Fallback if no comments were found in the DB
+    if not top_comments:
+        top_comments = ["No comments available."]
     upload_date = mongo_doc.get("upload_date")
 
     # 3. Fetch transcript from GCS
@@ -479,9 +499,9 @@ if __name__ == "__main__":
     if not transcript:
         print(f"[WARN] Transcript is empty for {video_id}. Pipeline may degrade.")
 
-    print(f"Starting pipeline for Video ID: {video_id}")
+    print(f"Starting pipeline for Video ID: {video_id} (Channel: {channel_title})")
 
-    #this is the features
+    # Extract the features
     features = extract_video_features_for_video(
         video_id=video_id,
         title=title,
@@ -489,19 +509,14 @@ if __name__ == "__main__":
         transcript=transcript
     )
     print("Extracted video features successfully")
-    # --- DATABASE INSERTION ---
     
-    if MONGODB_URI:
+    # --- DATABASE INSERTION ---
+    if db is not None:
         try:
-            # Initialize MongoDB Client
-            db_client = MongoClient(MONGODB_URI)
-            db = db_client["travel_app"]
-            
             # Build context mapping for the save function
             ctx = {
                 "video_id": video_id,
                 "title": title,
-                "description": description,
                 "tags": tags,
                 "top_comments": top_comments,
                 "channel_id": channel_id,
@@ -513,9 +528,9 @@ if __name__ == "__main__":
             n_ids, c_ids = save_features_to_collections(db, ctx, features)
             print(f"[SUCCESS] Saved to MongoDB. Inserted {len(n_ids)} narratives and {len(c_ids)} claims.")
         except Exception as e:
-            print(f"[ERROR] Failed to save to MongoDB: {e}")
+            print(f"[ERROR] Failed to save features to MongoDB: {e}")
     else:
-        print("[WARN] MONGODB_URI not found. Skipping database insertion.")
+        print("[WARN] MongoDB connection not established. Skipping database insertion.")
     #sanity check for embedding vector shape : PASS
     # vec = np.array(features["video_components"]["narratives"][0]["claims"][0]["claim_title_embedding"], dtype=float)
     # print("Dim:", vec.shape[0])
