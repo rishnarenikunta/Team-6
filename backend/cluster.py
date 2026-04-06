@@ -8,14 +8,36 @@ import hdbscan
 import umap
 from sklearn.metrics.pairwise import cosine_similarity
 from collections import Counter
-from datetime import datetime
+from datetime import datetime, timezone
 from bson import ObjectId
 
 load_dotenv()
 client = MongoClient(os.getenv("MONGODB_URI"))
 db = client["travel_app"]
 
+# --- Debug: check for mismatches ---
+print("\n=== DIAGNOSTIC ===")
 
+creator_ids = db["creators"].distinct("channel_id")
+narrative_channel_ids = db["narratives"].distinct("channel_id")
+claim_channel_ids = db["claims"].distinct("channel_id")
+
+print(f"Creators in 'creators' collection: {len(creator_ids)}")
+print(f"Distinct channel_ids in 'narratives': {len(narrative_channel_ids)}")
+print(f"Distinct channel_ids in 'claims': {len(claim_channel_ids)}")
+
+# Which creators have NO matching narratives
+missing_narratives = [c for c in creator_ids if c not in narrative_channel_ids]
+print(f"\nCreators with 0 matching narratives: {missing_narratives}")
+
+# Which creators have NO matching claims
+missing_claims = [c for c in creator_ids if c not in claim_channel_ids]
+print(f"\nCreators with 0 matching claims: {missing_claims}")
+
+# Sample a creator that should have data and check
+print(f"\nSample creator IDs from creators collection: {creator_ids[:3]}")
+print(f"Sample channel_ids from narratives collection: {narrative_channel_ids[:3]}")
+print("=== END DIAGNOSTIC ===\n")
 def get_top_doc_from_cluster(docs, embeddings):
     """Run UMAP + HDBSCAN and return the most representative doc in the largest cluster."""
     n_samples = len(embeddings)
@@ -58,93 +80,189 @@ def get_top_doc_from_cluster(docs, embeddings):
 
     return docs[best_global_idx], counts[top_cluster]
 
-#get top narratives 
+
+def filter_valid_docs(docs, vector_field, scope_type, type_id):
+    """Filter out docs with missing, null, or inhomogeneous vectors."""
+    valid = [
+        doc for doc in docs
+        if doc.get(vector_field) and isinstance(doc[vector_field], list)
+    ]
+
+    if not valid:
+        return []
+
+    expected_len = len(valid[0][vector_field])
+    valid = [doc for doc in valid if len(doc[vector_field]) == expected_len]
+
+    skipped = len(docs) - len(valid)
+    if skipped > 0:
+        print(f"⚠️  Skipped {skipped} docs with bad vectors for {scope_type}={type_id}")
+
+    return valid
+
 
 def compute_top_narrative(scope_type, scope_filter, type_id):
     """
     scope_type:   "country" | "creator" | "overall"
     scope_filter: MongoDB query dict to filter narratives collection
-    type_id:      string identifier for this scope (country name, channel_id, or "country::channel_id")
+    type_id:      string identifier for this scope (country name, channel_id, or "overall")
+
+    Falls back to the single available doc if fewer than 2 valid vectors exist.
+    Saves None values if no docs exist at all.
     """
     col = db["narratives"]
     docs = list(col.find(scope_filter))
 
-    if len(docs) < 2:
-        print(f"⚠️  Not enough narratives for {scope_type}={type_id}")
-        return
-
-    embeddings = np.array([doc["narrative_vector"] for doc in docs])
-    top_doc, cluster_size = get_top_doc_from_cluster(docs, embeddings)
-
-    if top_doc is None:
-        print(f"⚠️  No cluster found for narrative {scope_type}={type_id}")
-        return
-
-    db["top_narratives"].update_one(
-        {
-            "type":   scope_type,
-            "typeID": type_id
-        },
-        {
-            "$set": {
+    # No docs at all — save a None record and exit
+    if len(docs) == 0:
+        print(f"⚠️  No narratives found for {scope_type}={type_id}, saving null record")
+        db["top_narratives"].update_one(
+            {"type": scope_type, "typeID": type_id},
+            {"$set": {
                 "type":        scope_type,
                 "typeID":      type_id,
-                "narrativeID": top_doc.get("narrative_id"), 
-                "narrative":   top_doc["narrative_text"],
-                "channel_id":  top_doc.get("channel_id"),   # ← add
-                "video_id":    top_doc.get("video_id"),     # ← add
-                "clusterSize": cluster_size,
+                "narrativeID": None,
+                "narrative":   None,
+                "channel_id":  None,
+                "video_id":    None,
+                "clusterSize": None,
+                "totalDocs":   0,
+                "computedAt":  datetime.now(timezone.utc)
+            }},
+            upsert=True
+        )
+        return
+
+    valid_docs = filter_valid_docs(docs, "narrative_vector", scope_type, type_id)
+
+    # Fewer than 2 valid vectors — fall back to single doc (first valid, or first overall)
+    if len(valid_docs) < 2:
+        fallback_doc = valid_docs[0] if valid_docs else docs[0]
+        print(f"⚠️  Not enough valid vectors for {scope_type}={type_id}, using single fallback doc")
+        db["top_narratives"].update_one(
+            {"type": scope_type, "typeID": type_id},
+            {"$set": {
+                "type":        scope_type,
+                "typeID":      type_id,
+                "narrativeID": fallback_doc.get("narrative_id"),
+                "narrative":   fallback_doc.get("narrative_text"),
+                "channel_id":  fallback_doc.get("channel_id"),
+                "video_id":    fallback_doc.get("video_id"),
+                "clusterSize": 1,
                 "totalDocs":   len(docs),
-                "computedAt":  datetime.utcnow()
-            }
-        },
+                "computedAt":  datetime.now(timezone.utc)
+            }},
+            upsert=True
+        )
+        return
+
+    # Normal path — cluster and find top doc
+    embeddings = np.array([doc["narrative_vector"] for doc in valid_docs])
+    top_doc, cluster_size = get_top_doc_from_cluster(valid_docs, embeddings)
+
+    # Clustering returned nothing — fall back to first valid doc
+    if top_doc is None:
+        print(f"⚠️  No cluster found for {scope_type}={type_id}, using single fallback doc")
+        top_doc = valid_docs[0]
+        cluster_size = 1
+
+    db["top_narratives"].update_one(
+        {"type": scope_type, "typeID": type_id},
+        {"$set": {
+            "type":        scope_type,
+            "typeID":      type_id,
+            "narrativeID": top_doc.get("narrative_id"),
+            "narrative":   top_doc.get("narrative_text"),
+            "channel_id":  top_doc.get("channel_id"),
+            "video_id":    top_doc.get("video_id"),
+            "clusterSize": cluster_size,
+            "totalDocs":   len(docs),
+            "computedAt":  datetime.now(timezone.utc)
+        }},
         upsert=True
     )
-    print(f"narrative saved: {scope_type}={type_id}")
-
-
+    print(f"✅ narrative saved: {scope_type}={type_id}")
 
 
 def compute_top_claim(scope_type, scope_filter, creator_id, country):
-   
+
     type_id = _make_type_id(scope_type, creator_id, country)
 
     col = db["claims"]
     docs = list(col.find(scope_filter))
 
-    if len(docs) < 2:
-        print(f"⚠️  Not enough claims for {scope_type}={type_id}")
-        return
-
-    embeddings = np.array([doc["claim_vector"] for doc in docs])
-    top_doc, cluster_size = get_top_doc_from_cluster(docs, embeddings)
-
-    if top_doc is None:
-        print(f"⚠️  No cluster found for claim {scope_type}={type_id}")
-        return
-
-    db["top_claims"].update_one(
-        {
-            "type":   scope_type,
-            "typeID": type_id
-        },
-        {
-            "$set": {
+    # No docs at all — save a None record and exit
+    if len(docs) == 0:
+        print(f"⚠️  No claims found for {scope_type}={type_id}, saving null record")
+        db["top_claims"].update_one(
+            {"type": scope_type, "typeID": type_id},
+            {"$set": {
                 "type":        scope_type,
                 "typeID":      type_id,
-                "creatorID":   top_doc.get("source"),
+                "creatorID":   None,
                 "country":     country,
-                "claimID":     top_doc["_id"],
-                "claimText":   top_doc["claim_text"],
-                "narrativeID": top_doc.get("narrative_id"),  # the narrative that generated this claim
-                "clusterSize": cluster_size,
+                "claimID":     None,
+                "claimText":   None,
+                "narrativeID": None,
+                "clusterSize": None,
+                "totalDocs":   0,
+                "computedAt":  datetime.now(timezone.utc)
+            }},
+            upsert=True
+        )
+        return
+
+    valid_docs = filter_valid_docs(docs, "claim_vector", scope_type, type_id)
+
+    # Fewer than 2 valid vectors — fall back to single doc
+    if len(valid_docs) < 2:
+        fallback_doc = valid_docs[0] if valid_docs else docs[0]
+        print(f"⚠️  Not enough valid vectors for {scope_type}={type_id}, using single fallback doc")
+        db["top_claims"].update_one(
+            {"type": scope_type, "typeID": type_id},
+            {"$set": {
+                "type":        scope_type,
+                "typeID":      type_id,
+                "creatorID":   fallback_doc.get("source"),
+                "country":     country,
+                "claimID":     fallback_doc.get("_id"),
+                "claimText":   fallback_doc.get("claim_text"),
+                "narrativeID": fallback_doc.get("narrative_id"),
+                "clusterSize": 1,
                 "totalDocs":   len(docs),
-                "computedAt":  datetime.utcnow()
-            }
-        },
+                "computedAt":  datetime.now(timezone.utc)
+            }},
+            upsert=True
+        )
+        return
+
+    # Normal path — cluster and find top doc
+    embeddings = np.array([doc["claim_vector"] for doc in valid_docs])
+    top_doc, cluster_size = get_top_doc_from_cluster(valid_docs, embeddings)
+
+    # Clustering returned nothing — fall back to first valid doc
+    if top_doc is None:
+        print(f"⚠️  No cluster found for {scope_type}={type_id}, using single fallback doc")
+        top_doc = valid_docs[0]
+        cluster_size = 1
+
+    db["top_claims"].update_one(
+        {"type": scope_type, "typeID": type_id},
+        {"$set": {
+            "type":        scope_type,
+            "typeID":      type_id,
+            "creatorID":   top_doc.get("source"),
+            "country":     country,
+            "claimID":     top_doc["_id"],
+            "claimText":   top_doc["claim_text"],
+            "narrativeID": top_doc.get("narrative_id"),
+            "clusterSize": cluster_size,
+            "totalDocs":   len(docs),
+            "computedAt":  datetime.now(timezone.utc)
+        }},
         upsert=True
     )
-    print(f"claim saved: {scope_type}={type_id}")
+    print(f"✅ claim saved: {scope_type}={type_id}")
 
 
 def _make_type_id(scope_type, creator_id, country):
@@ -155,13 +273,12 @@ def _make_type_id(scope_type, creator_id, country):
     return "overall"
 
 
-#overall bascially 
+# --- Run ---
 
-# distinct vlaues 
-countries = db["narratives"].distinct("destination")   # rename field if needed
+countries = db["narratives"].distinct("destination")
 creators  = db["creators"].distinct("channel_id")
 
-# top narratives per country
+# Top narratives per country
 for country in countries:
     compute_top_narrative(
         scope_type="country",
@@ -169,7 +286,7 @@ for country in countries:
         type_id=country
     )
 
-#creator 
+# Top narratives per creator
 for creator in creators:
     compute_top_narrative(
         scope_type="creator",
@@ -177,14 +294,14 @@ for creator in creators:
         type_id=creator
     )
 
-# overall 
+# Overall top narrative
 compute_top_narrative(
     scope_type="overall",
-    scope_filter={},          # all narratives
+    scope_filter={},
     type_id="overall"
 )
 
-# claims
+# Top claims per country
 for country in countries:
     compute_top_claim(
         scope_type="country",
@@ -193,6 +310,7 @@ for country in countries:
         country=country
     )
 
+# Top claims per creator
 for creator in creators:
     compute_top_claim(
         scope_type="creator",
@@ -201,16 +319,16 @@ for creator in creators:
         country=None
     )
 
-
+# Overall top claim
 compute_top_claim(
     scope_type="overall",
-    scope_filter={},          # all claims
+    scope_filter={},
     creator_id=None,
     country=None
 )
 
 
-#results to check if table is working 
+# --- Print results ---
 
 def print_table(collection_name, label):
     print(f"\n{'=' * 70}")
@@ -226,7 +344,7 @@ def print_table(collection_name, label):
     for row in rows:
         if row["type"] != current_type:
             current_type = row["type"]
-            print(f"\n{current_type.upper()} ")
+            print(f"\n{current_type.upper()}")
 
         print(f"\n  {row.get('typeID')}")
 
@@ -236,7 +354,7 @@ def print_table(collection_name, label):
         else:
             print(f"  {row.get('claimText')}")
             print(f"  claimID: {row.get('claimID')}  |  narrativeID: {row.get('narrativeID')}")
-            print(f"  creatorID: {row.get('creatorID')}  |  🌍 destination: {row.get('country')}")
+            print(f"  creatorID: {row.get('creatorID')}  |  destination: {row.get('country')}")
 
         print(f"  Cluster: {row.get('clusterSize')} / {row.get('totalDocs')}  |  {row.get('computedAt')}")
 

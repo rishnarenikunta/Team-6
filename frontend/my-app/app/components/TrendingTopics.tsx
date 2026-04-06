@@ -12,7 +12,7 @@ export default function TrendingTopics() {
       try {
         const res = await fetch("http://127.0.0.1:8000/api/topics/trending")
         const data = await res.json()
-        setTopics(data)
+        setTopics(data.topics)
         console.log("Number of trending topics:", data.length)
       } catch (error) {
         console.error("Failed to fetch topics:", error)

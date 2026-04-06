@@ -33,7 +33,7 @@ export default function ClaimsCarousel() {
         const res = await fetch(`${API_BASE}/api/claims/trending`);
         if (!res.ok) throw new Error(`API error ${res.status}`);
         const data = await res.json();
-        setClaims(data.claims);
+        setClaims(data);
       } catch (err) {
         console.error("Fetch error:", err);
         setError("Could not load claims.");

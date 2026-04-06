@@ -1,6 +1,12 @@
 fastapi
 uvicorn
 youtube-transcript-api
+numpy
+hdbscan
+umap-learn
+scikit-learn
+pymongo
+python-dotenv
 
 yt-dlp
 pymongo[srv]
