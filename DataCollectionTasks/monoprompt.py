@@ -475,7 +475,7 @@ if __name__ == "__main__":
         if creator and "name" in creator:
             channel_title = creator["name"]
     
-    tags = ["travel", "vlog", "europe", "vacation"]
+    tags = mongo_doc.get("tags", [])
     title = mongo_doc.get("title")
     top_comments = [
         "Loved the scenes from Paris!",
