@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { notFound } from "next/navigation"
 
 type ContentCreator = {
   slug: string
@@ -17,9 +18,28 @@ type ContentCreator = {
   risk: RiskStats[]
 }
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+
 type RiskStats = {
   riskTitle: string
   riskDescription: string
+}
+
+type ApiContentCreator = {
+  channel_id: string
+  name: string
+  subscriber_count: number
+  views: number
+  join_date?: string
+  top_claim?: string | null
+  cluster_size?: number | null
+  computed_at?: string | null
+  claims?: {
+    destination: string
+    claim_text: string
+    claim_risk: string
+    date: string
+  }[]
 }
 
 const creators: ContentCreator[] = [
@@ -223,16 +243,29 @@ type Params = { params: Promise<{ slug: string }> }
 
 export default async function CreatorDetailPage({ params }: Params) {
   const { slug } = await params
-  const creator = creators.find((c) => c.slug === slug)
-  const avatar = creator?.profilePhoto ?? creator?.videos[0]?.img ?? ""
+
+  let creator: ContentCreator | undefined
+
+  try {
+    const res = await fetch(`${API_BASE}/api/creators/${slug}`, { cache: "no-store" })
+    if (res.ok) {
+      const apiCreator: ApiContentCreator = await res.json()
+      creator = mapApiCreatorToContentCreator(apiCreator)
+    }
+  } catch (err) {
+    console.error(`Failed to fetch creator ${slug}:`, err)
+  }
+
+  // Fallback to static seed data if API is missing
+  if (!creator) {
+    creator = creators.find((c) => c.slug === slug)
+  }
 
   if (!creator) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-[#0b0b10] via-[#0f1018] to-[#0b0b10] text-white flex items-center justify-center">
-        <p className="text-gray-300">Creator not found.</p>
-      </div>
-    )
+    notFound()
   }
+
+  const avatar = creator.profilePhoto ?? creator.videos[0]?.img ?? ""
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#0b0b10] via-[#0f1018] to-[#0b0b10] text-white">
@@ -399,4 +432,53 @@ function SentimentRow({ label, value, color }: { label: string; value: number; c
       </div>
     </div>
   )
+}
+
+function mapApiCreatorToContentCreator(api: ApiContentCreator): ContentCreator {
+  const defaultSentiment = { positive: 60, neutral: 30, negative: 10 }
+  const claims = api.claims ?? []
+  const topThemes =
+    claims.length > 0
+      ? Array.from(new Set(claims.map((c) => c.destination || "Travel"))).slice(0, 6)
+      : ["Travel"]
+  const highlightedComments =
+    claims.length > 0
+      ? claims.slice(0, 2).map((c) => c.claim_text)
+      : ["No highlighted comments."]
+  const videos =
+    claims.length > 0
+      ? claims.slice(0, 3).map((c) => ({
+          title: c.claim_text,
+          views: `${formatNumber(api.views ?? 0)} views`,
+          img: "/images/placeholder.jpg",
+          link: "#",
+        }))
+      : [
+          {
+            title: api.top_claim || "Recent upload",
+            views: `${formatNumber(api.views ?? 0)} views`,
+            img: "/images/placeholder.jpg",
+            link: "#",
+          },
+        ]
+
+  return {
+    slug: api.channel_id ?? "unknown",
+    name: api.name ?? "Unknown creator",
+    region: "Americas",
+    domain: "Travel creator",
+    subscribers: api.subscriber_count ?? 0,
+    monthlyViews: api.views ?? 0,
+    contentType: "Travel",
+    videos: videos.length > 0 ? videos : [],
+    profilePhoto: undefined,
+    commentVolume30d: api.cluster_size ?? 0,
+    sentiment: defaultSentiment,
+    topThemes,
+    highlightedComments: highlightedComments.length > 0 ? highlightedComments : ["No highlighted comments."],
+    risk: [
+      { riskTitle: "Avg. Sentiment", riskDescription: "+60% positive" },
+      { riskTitle: "Risk Band", riskDescription: "Low" },
+    ],
+  }
 }
