@@ -1,14 +1,21 @@
-FROM python:3.10-slim
+# ---------- Build React ----------
+FROM node:18 AS build
 
 WORKDIR /app
+COPY frontend/my-app/package*.json ./
+RUN npm install
 
-COPY requirements.txt .
+COPY frontend/my-app .
+RUN npm run build
 
-RUN pip install --no-cache-dir -r requirements.txt
 
-COPY youtubeTranscriptionApi.py .
+# ---------- Production image ----------
+FROM node:18
+
+WORKDIR /app
+RUN npm install -g serve
+
+COPY --from=build /app/build ./build
 
 EXPOSE 8080
-
-CMD ["sh", "-c", "uvicorn youtubeTranscriptionApi:app --host 0.0.0.0 --port ${PORT:-8080}"]
-
+CMD ["serve", "-s", "build", "-l", "8080"]
