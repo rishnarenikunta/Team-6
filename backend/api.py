@@ -390,11 +390,11 @@ def get_narrative_detail(slug: str) -> dict[str, Any]:
 
     # Other narratives for same destination (siblings)
     siblings = list(
-        db["narratives"].find(
-            {"destination": destination, "narrative_id": {"$ne": slug}},
-            {"narrative_vector": 0, "_id": 0, "narrative_id": 1, "narrative_text": 1},
-        ).limit(5)
-    )
+    db["narratives"].find(
+        {"destination": destination, "narrative_id": {"$ne": slug}},
+        {"narrative_id": 1, "narrative_text": 1},  # _id included by default, that's fine
+    ).limit(5)
+)   
 
     return {
         "id":             str(doc["_id"]),
