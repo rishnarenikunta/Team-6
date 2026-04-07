@@ -606,7 +606,7 @@ def top_20_videos_by_bucket_store(
     if (w_views + w_likes + w_comments) <= 0:
         raise HTTPException(status_code=400, detail="Weights must sum to > 0")
 
-    return {"matched": 0, "modified": 0, "upserted": 0}
+    results: dict[str, list[dict]] = {}
 
     for bucket, channels in CHANNEL_BUCKETS.items():
         results[bucket] = []
@@ -694,11 +694,12 @@ def top_20_videos_by_bucket_store(
                 "top_20": stored,
             })
 
-    video_url = f"https://www.youtube.com/watch?v={video_id}"
-    cookies_path = os.getenv("YT_COOKIES_PATH")
+    return {"status": "ok", "results": results}
 
 
-            audio_path = max(audio_candidates, key=os.path.getsize)
+class YouTubeRequest(BaseModel):
+    video_id: str
+    model: str = "gpt-4o-mini-transcribe"
 
 
 @app.post("/transcribe/youtube")
