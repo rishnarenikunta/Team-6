@@ -1,8 +1,9 @@
+# Dockerfile
 FROM node:18
 
 WORKDIR /app
 
-COPY package*.json ./
+COPY frontend/my-app/package*.json ./
 RUN npm install
 
 COPY requirements.txt .
@@ -11,9 +12,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-RUN npm run build 
+RUN npm run build  # if React frontend
 
 EXPOSE 8080
 
 CMD ["npm", "run", "dev"]
-
