@@ -41,8 +41,10 @@ jobs:
 
     - name: Update Cloud Run Dispatcher Job Image
       run: |
+        # 1. Search the raw job config for the exact Artifact Registry URL
         IMAGE_URL=$(gcloud run jobs describe youtravel-llm-job --region us-central1 --format=yaml | grep -o "us-central1-docker.pkg.dev/youtravel-487521/[^ '\"]*" | head -n 1)
         
+        # 2. Safety check: ensure we actually found the URL
         if [ -z "$IMAGE_URL" ]; then
           echo "Error: Could not find the image URL in the job description."
           exit 1
@@ -50,6 +52,7 @@ jobs:
         
         echo "Found newest image: $IMAGE_URL"
         
+        # 3. Update the dispatcher job
         gcloud run jobs update youtravel-batch-dispatcher \
           --image "$IMAGE_URL" \
           --region us-central1
