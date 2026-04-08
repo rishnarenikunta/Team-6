@@ -30,7 +30,7 @@ jobs:
     - name: Set up Cloud SDK
       uses: google-github-actions/setup-gcloud@v2
 
-    - name: Deploy Cloud Run Job
+    - name: Deploy Cloud Run Worker Job
       run: |
         gcloud run jobs deploy youtravel-llm-job \
           --source . \
@@ -38,3 +38,11 @@ jobs:
           --quiet \
           --command python \
           --args DataCollectionTasks/monoprompt.py
+
+    - name: Update Cloud Run Dispatcher Job Image
+      run: |
+        IMAGE_URL=$(gcloud run jobs describe youtravel-llm-job --region us-central1 --format="value(template.template.containers[0].image)")
+        
+        gcloud run jobs update youtravel-batch-dispatcher \
+          --image $IMAGE_URL \
+          --region us-central1
