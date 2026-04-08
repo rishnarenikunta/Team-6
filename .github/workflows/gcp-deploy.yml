@@ -41,8 +41,15 @@ jobs:
 
     - name: Update Cloud Run Dispatcher Job Image
       run: |
-        IMAGE_URL=$(gcloud run jobs describe youtravel-llm-job --region us-central1 --format="value(template.template.containers[0].image)")
+        IMAGE_URL=$(gcloud run jobs describe youtravel-llm-job --region us-central1 --format=yaml | grep -o "us-central1-docker.pkg.dev/youtravel-487521/[^ '\"]*" | head -n 1)
+        
+        if [ -z "$IMAGE_URL" ]; then
+          echo "Error: Could not find the image URL in the job description."
+          exit 1
+        fi
+        
+        echo "Found newest image: $IMAGE_URL"
         
         gcloud run jobs update youtravel-batch-dispatcher \
-          --image $IMAGE_URL \
+          --image "$IMAGE_URL" \
           --region us-central1
