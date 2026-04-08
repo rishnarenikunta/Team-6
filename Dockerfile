@@ -1,11 +1,15 @@
-# ---------- Build Frontend ----------
-FROM node:18 AS frontend-build
+FROM node:18 AS build
 
-WORKDIR /app/frontend
+WORKDIR /app
+
+# Go directly into the Next project
+WORKDIR /app/frontend/my-app
+
 COPY frontend/my-app/package*.json ./
 RUN npm install
 
-COPY frontend/my-app .
+COPY frontend/my-app ./
+
 RUN npm run build
 
 
