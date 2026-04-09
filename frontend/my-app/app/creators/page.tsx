@@ -8,7 +8,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 type Creator = {
   slug: string
   name: string
-  region: "Americas" | "EMEA" | "APAC"
+  // region: "Americas" | "EMEA" | "APAC"
   domain: string
   subscribers: number
   monthlyViews: number
@@ -49,7 +49,7 @@ type ApiCreator = {
 //   }
 // ]
 
-const regions = ["All regions", "Americas", "EMEA", "APAC"] as const
+// const regions = ["All regions", "Americas", "EMEA", "APAC"] as const
 const subscriberBuckets = ["Any size", "< 250k", "250k - 1M", "> 1M"] as const
 const viewBuckets = ["Any views", "< 5M / mo", "5M - 15M / mo", "> 15M / mo"] as const
 const contentTypes = ["All types", "Travel", "Food", "Lifestyle/Vlog", "Wellness", "Tech", "Entertainment", "News"] as const
@@ -68,7 +68,7 @@ export default function CreatorsPage() {
         const mapped: Creator[] = data.map((item) => ({
           slug: item.channel_id ?? "unknown",
           name: item.name ?? "Unknown creator",
-          region: "Americas",                     // default until API supplies region
+          // region: "Americas",                     // default until API supplies region
           domain: "Travel creator",               // default domain
           subscribers: item.subscriber_count ?? 0,
           monthlyViews: item.views ?? 0,
@@ -95,15 +95,15 @@ export default function CreatorsPage() {
   }, []);
 
   
-  const [region, setRegion] = useState<(typeof regions)[number]>("All regions")
+  // const [region, setRegion] = useState<(typeof regions)[number]>("All regions")
   const [subs, setSubs] = useState<(typeof subscriberBuckets)[number]>("Any size")
   const [views, setViews] = useState<(typeof viewBuckets)[number]>("Any views")
   const [type, setType] = useState<(typeof contentTypes)[number]>("All types")
-  const [rankingRegion, setRankingRegion] = useState<Creator["region"]>("Americas")
+  // const [rankingRegion, setRankingRegion] = useState<Creator["region"]>("Americas")
 
   const filtered = useMemo(() => {
     return creators.filter((creator) => {
-      const regionOk = region === "All regions" || creator.region === region
+      // const regionOk = region === "All regions" || creator.region === region
       const typeOk = type === "All types" || creator.contentType === type
       const subsOk =
         subs === "Any size" ||
@@ -116,21 +116,21 @@ export default function CreatorsPage() {
         (views === "5M - 15M / mo" && creator.monthlyViews >= 5000000 && creator.monthlyViews <= 15000000) ||
         (views === "> 15M / mo" && creator.monthlyViews > 15000000)
 
-      return regionOk && typeOk && subsOk && viewsOk
+      return typeOk && subsOk && viewsOk
     })
-  }, [region, subs, type, views])
+  }, [creators, subs, type, views])
 
-  const regionalRankings = useMemo(() => {
-    const groups: Record<string, Creator[]> = { Americas: [], EMEA: [], APAC: [] }
-    creators.forEach((c) => {
-      groups[c.region].push(c)
-    })
-    return (Object.entries(groups) as [Creator["region"], Creator[]][])
-      .map(([reg, list]) => ({
-        region: reg,
-        top: [...list].sort((a, b) => b.subscribers - a.subscribers).slice(0, 5),
-      }))
-  }, [creators])
+  // const regionalRankings = useMemo(() => {
+  //   const groups: Record<string, Creator[]> = { Americas: [], EMEA: [], APAC: [] }
+  //   creators.forEach((c) => {
+  //     groups[c.region].push(c)
+  //   })
+  //   return (Object.entries(groups) as [Creator["region"], Creator[]][])
+  //     .map(([reg, list]) => ({
+  //       region: reg,
+  //       top: [...list].sort((a, b) => b.subscribers - a.subscribers).slice(0, 5),
+  //     }))
+  // }, [creators])
 
 
   return (
@@ -140,14 +140,14 @@ export default function CreatorsPage() {
           <p className="text-xs uppercase tracking-[0.3em] text-gray-400">Creators</p>
           <h1 className="text-4xl font-semibold leading-tight">Find creators to sponsor</h1>
           <p className="text-sm text-gray-300 max-w-3xl">
-            Filter by region, audience size, and format to spot creators with strong disclosure history and brand-safe
+            Filter by audience size and format to spot creators with strong disclosure history and brand-safe
             audiences.
           </p>
         </header>
 
         <section className="rounded-2xl border border-white/10 bg-[#0f0f17] p-5 shadow-none">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 shadow-none">
-            <FilterSelect label="Region" value={region} options={regions} onChange={setRegion} />
+            {/* <FilterSelect label="Region" value={region} options={regions} onChange={setRegion} /> */}
             <FilterSelect label="Subscribers" value={subs} options={subscriberBuckets} onChange={setSubs} />
             <FilterSelect label="Monthly views" value={views} options={viewBuckets} onChange={setViews} />
             <FilterSelect label="Content type" value={type} options={contentTypes} onChange={setType} />
@@ -169,7 +169,7 @@ export default function CreatorsPage() {
                 <div className="space-y-1">
                   <h2 className="text-xl font-semibold text-white">{creator.name}</h2>
                   <p className="text-sm text-gray-400">{creator.domain}</p>
-                  <p className="text-xs text-gray-500">{creator.region}</p>
+                  {/* <p className="text-xs text-gray-500">{creator.region}</p> */}
                 </div>
                 <span className="rounded-full bg-emerald-400/15 px-3 py-1 text-[11px] uppercase tracking-wide text-emerald-200">
                   Brand safe
@@ -184,9 +184,9 @@ export default function CreatorsPage() {
                 <Stat label="Typical CPM" value="$18–$26" />
               </div>
 
-              {/* RECENT VIDEOS SECTION */}
+              {/* RECENT CLAIMS SECTION */}
               <div className="mt-4 space-y-2">
-                <p className="text-xs uppercase tracking-[0.18em] text-gray-400">Recent videos</p>
+                <p className="text-xs uppercase tracking-[0.18em] text-gray-400">Recent Claims</p>
                 <div className="space-y-2 text-sm text-gray-200">
                   {creator.videos.map((video) => (
                     <div
@@ -218,7 +218,7 @@ export default function CreatorsPage() {
             ))}
           </div>
 
-          {/* REGIONAL RANKING SECTION */}
+          {/* REGIONAL RANKING SECTION
           <aside className="rounded-2xl bg-[#E4CAFF] p-5 space-y-4 h-fit lg:sticky lg:top-6">
             <div className="flex items-center justify-between">
               <div>
@@ -259,7 +259,7 @@ export default function CreatorsPage() {
                   </div>
                 </div>
               ))}
-          </aside>
+          </aside> */}
         </section>
       </div>
     </div>
