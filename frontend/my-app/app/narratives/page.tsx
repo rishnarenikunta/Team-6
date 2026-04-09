@@ -10,7 +10,7 @@ type Narrative = {
   sentiment: "positive" | "neutral" | "negative"
   velocity: string
   creators: string
-  watchtime: string
+  date: string
   claim: string
   risk: string
   tags: string[]
@@ -26,7 +26,7 @@ const fallbackNarratives: Narrative[] = [
     sentiment: "positive",
     velocity: "+18% week-over-week",
     creators: "72 active creators",
-    watchtime: "3.4M hrs past 30d",
+    date: "2023-10-01",
     claim: "Rural rail passes and farm-stays are beating city itineraries for engagement.",
     risk: "Low creator risk",
     tags: ["slow travel", "rail", "food", "autumn"],
@@ -73,7 +73,7 @@ useEffect(() => {
       const res = await fetch(`${API_BASE}/api/narratives`);
       if (!res.ok) throw new Error(`API error ${res.status}`);
       const data: ApiNarrativesResponse = await res.json();
-
+      console.log("Fetched narratives:", data);
       const mapped: Narrative[] = data.items.map((item) => ({
         slug: item.slug || item.narrative_id || String(item.id),
         title: item.text,                 // or item.destination, or truncate(item.text)
@@ -81,7 +81,7 @@ useEffect(() => {
         sentiment: "neutral",             // until the API provides sentiment
         velocity: "—",
         creators: item.creator_name || "Unknown creator",
-        watchtime: "—",
+        date: item.date,
         claim: item.text,
         risk: "—",
         tags: [],                         // populate when API includes tags
@@ -197,12 +197,12 @@ useEffect(() => {
 
                   <div className="mt-5 grid grid-cols-2 gap-3 text-xs text-gray-300">
                     <div className="rounded-xl bg-white/5 px-3 py-2 border border-white/10">
-                      <p className="text-[10px] uppercase tracking-wide text-gray-400">Creator mix</p>
+                      <p className="text-[10px] uppercase tracking-wide text-gray-400">Creator Name</p>
                       <p className="font-medium">{narrative.creators}</p>
                     </div>
                     <div className="rounded-xl bg-white/5 px-3 py-2 border border-white/10">
-                      <p className="text-[10px] uppercase tracking-wide text-gray-400">Watchtime</p>
-                      <p className="font-medium">{narrative.watchtime}</p>
+                      <p className="text-[10px] uppercase tracking-wide text-gray-400">Date</p>
+                      <p className="font-medium">{narrative.date}</p>
                     </div>
                     <div className="rounded-xl bg-white/5 px-3 py-2 border border-white/10">
                       <p className="text-[10px] uppercase tracking-wide text-gray-400">Risk</p>
