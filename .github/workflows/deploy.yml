@@ -1,0 +1,99 @@
+name: Build and Deploy to Cloud Run
+
+on:
+  push:
+    branches:
+      - integration # Or whichever branch you want to trigger the deployment
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  REGION: ${{ secrets.GCP_REGION }}
+
+jobs:
+  deploy-frontend:
+    runs-on: ubuntu-latest
+    # Only run this job if files in the frontend folder changed!
+    # This saves time and money.
+    on:
+      push:
+        paths:
+          - 'frontend/my-app/**'
+    
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.SA_EMAIL }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker to use Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
+
+      - name: Build and Push Docker Image
+        run: |
+          IMAGE_NAME=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/frontend-repo/my-app:${{ github.sha }}
+          docker build -t $IMAGE_NAME ./frontend/my-app
+          docker push $IMAGE_NAME
+
+      - name: Deploy to Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: frontend-service
+          image: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/frontend-repo/my-app:${{ github.sha }}
+          region: ${{ env.REGION }}
+          flags: '--allow-unauthenticated' # Makes it publically accessible
+
+  deploy-backend:
+      runs-on: ubuntu-latest
+      # Only run this job if files in the backend folder changed
+      on:
+        push:
+          paths:
+            - 'backend/**'
+      
+      permissions:
+        contents: 'read'
+        id-token: 'write'
+
+      steps:
+        - name: Checkout Code
+          uses: actions/checkout@v4
+
+        - name: Authenticate to GCP
+          uses: google-github-actions/auth@v2
+          with:
+            workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+            service_account: ${{ secrets.SA_EMAIL }}
+
+        - name: Set up Cloud SDK
+          uses: google-github-actions/setup-gcloud@v2
+
+        - name: Configure Docker to use Artifact Registry
+          run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
+
+        - name: Build and Push Docker Image
+          run: |
+            IMAGE_NAME=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/backend-repo/my-api:${{ github.sha }}
+            docker build -t $IMAGE_NAME ./backend
+            docker push $IMAGE_NAME
+
+        - name: Deploy to Cloud Run
+          uses: google-github-actions/deploy-cloudrun@v2
+          with:
+            service: backend-service
+            image: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/backend-repo/my-api:${{ github.sha }}
+            region: ${{ env.REGION }}
+            flags: '--allow-unauthenticated'
+            # Pass the MongoDB URI secret as an environment variable to the container
+            env_vars: |
+              MONGODB_URI=${{ secrets.MONGODB_URI }}
