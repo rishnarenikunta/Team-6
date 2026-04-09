@@ -185,7 +185,7 @@ def get_creators() -> list[dict[str, Any]]:
     return results
 
 
-# ── /api/creators/{channel_id}  ───────────────────────────────────────────────
+# ── /api/creators/{channel_id}  ──────-─────────────────────────────────────────
 
 @app.get("/api/creators/{channel_id}")
 def get_creator(channel_id: str) -> dict[str, Any]:
