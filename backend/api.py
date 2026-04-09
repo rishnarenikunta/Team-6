@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pymongo import MongoClient
-from typing import Any
+from typing import Any, Optional
 
 load_dotenv()
 
@@ -90,7 +90,7 @@ def get_trending_narratives() -> list[dict[str, Any]]:
     return result
 
 @app.get("/api/destinations")
-def get_destinations(region: str | None = None, tag: str | None = None) -> list[dict[str, Any]]:
+def get_destinations(region: Optional[str]= None, tag: Optional[str]= None) -> list[dict[str, Any]]:
 
     REGIONS: dict[str, list[str]] = {
         "asia":     ["Japan", "South Korea", "Thailand", "Vietnam"],
@@ -314,7 +314,7 @@ def get_main_stats() -> dict[str, Any]:
 
 @app.get("/api/narratives")
 def list_narratives(
-    destination: str | None = None,
+    destination: Optional[str]= None,
     limit: int = 20,
     offset: int = 0,
 ) -> dict[str, Any]:
