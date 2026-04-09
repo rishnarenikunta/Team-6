@@ -75,4 +75,4 @@ if __name__ == "__main__":
     parser.add_argument("--collection", type=str, default="metadata", help="MongoDB collection to read from.")
     args = parser.parse_args()
     
-    run_dispatcher(override_all=args.all, collection_name=args.collection)
+    run_dispatcher(override_all=args.all)
