@@ -6,6 +6,16 @@ from dotenv import load_dotenv
 from pymongo import MongoClient
 from bson import json_util
 from google.cloud import run_v2
+from tenacity import retry, wait_exponential, retry_if_exception_type
+from google.api_core.exceptions import ResourceExhausted # This is the specific 429 error
+
+# if Quota Exceeded error, wait double the time and try again
+@retry(
+    retry=retry_if_exception_type(ResourceExhausted),
+    wait=wait_exponential(multiplier=2, min=2, max=10)
+)
+def safe_dispatch(run_client, job_request):
+    run_client.run_job(request=job_request)
 
 def run_dispatcher(override_all: bool):
     load_dotenv()
@@ -59,10 +69,10 @@ def run_dispatcher(override_all: bool):
             )
             
             # Asynchronous trigger - fires and forgets
-            run_client.run_job(request=job_request)
+            safe_dispatch(run_client, job_request)
             
-            # Brief sleep to avoid hitting GCP API rate limits if dispatching thousands
-            time.sleep(0.1) 
+            # You can keep a very small sleep here just to be nice to the CPU
+            time.sleep(0.1)
 
         except Exception as e:
             print(f"[ERROR] Failed to dispatch job for {video_id}: {e}")
