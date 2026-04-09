@@ -360,7 +360,6 @@ def list_narratives(
 @app.get("/api/narratives/{slug}")
 def get_narrative_detail(slug: str) -> dict[str, Any]:
 
-    # slug = narrative_id value (e.g. "narr_kyoto_01")
     doc = db["narratives"].find_one(
         {"narrative_id": slug},
         {"narrative_vector": 0},
@@ -373,7 +372,13 @@ def get_narrative_detail(slug: str) -> dict[str, Any]:
 
     creator = db["creators"].find_one({"channel_id": channel_id}, {"_id": 0}) or {}
 
-    # Related claims for the same destination
+    # ── Fetch video metadata using video_id from the narrative ────────────────
+    video_id = doc.get("video_id", "")
+    meta = db["metadata"].find_one(
+        {"video_id": video_id},
+        {"_id": 0, "webpage_url": 1, "views": 1, "upload_date": 1, "channel_url": 1}
+    ) or {}
+
     related_claims = list(
         db["claims"].find(
             {"destination": destination},
@@ -381,20 +386,18 @@ def get_narrative_detail(slug: str) -> dict[str, Any]:
         ).limit(10)
     )
 
-    # Top cluster result for this destination (if available)
     cluster = db["top_narratives"].find_one({
         "destination_id": destination,
         "scope_type": "destination",
         "content_type": "narratives",
     })
 
-    # Other narratives for same destination (siblings)
     siblings = list(
-    db["narratives"].find(
-        {"destination": destination, "narrative_id": {"$ne": slug}},
-        {"narrative_id": 1, "narrative_text": 1},  # _id included by default, that's fine
-    ).limit(5)
-)   
+        db["narratives"].find(
+            {"destination": destination, "narrative_id": {"$ne": slug}},
+            {"narrative_id": 1, "narrative_text": 1},
+        ).limit(5)
+    )
 
     return {
         "id":             str(doc["_id"]),
@@ -414,6 +417,12 @@ def get_narrative_detail(slug: str) -> dict[str, Any]:
             {"slug": s["narrative_id"], "text": s["narrative_text"]}
             for s in siblings
         ],
+        # ── video fields from metadata collection ─────────────────────────────
+        "video_id":        video_id,
+        "video_url":       meta.get("webpage_url", ""),
+        "video_views":     meta.get("views", 0),
+        "video_published": meta.get("upload_date", ""),   # keep as-is (likely already a string like "20240101")
+        "video_channel":   meta.get("channel_url", ""),
     }
 
 

@@ -1,24 +1,16 @@
-# ---------- Build Next.js ----------
 FROM node:20-bullseye AS build
 
 WORKDIR /app
-
 COPY frontend/my-app/package*.json ./
 RUN npm install
-
 COPY frontend/my-app ./
-
 RUN npm run build
 
-# ---------- Production image ----------
 FROM node:20-bullseye
-
 WORKDIR /app
-ENV PORT=8080
-EXPOSE $PORT
-
-RUN npm install -g serve
-
 COPY --from=build /app ./
+
+ENV PORT=8080
+EXPOSE 8080
 
 CMD ["npm", "run", "start"]
