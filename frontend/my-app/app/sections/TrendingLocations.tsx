@@ -12,7 +12,6 @@ import {
 } from "recharts";
 import { motion, AnimatePresence } from "framer-motion";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 const LINE_COLORS = ["#ff7cf0", "#c084fc", "#6366f1"];
 
@@ -52,7 +51,7 @@ export default function TrendingLocations() {
   useEffect(() => {
     async function fetchLocations() {
       try {
-        const res = await fetch(`${API_BASE}/api/destinations/trending-locations`);
+        const res = await fetch(`/api/destinations/trending-locations`);
         if (!res.ok) throw new Error(`API ${res.status}`);
         const data: Location[] = await res.json();
         setLocations(data);

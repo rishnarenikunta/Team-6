@@ -1,6 +1,8 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
+
 type Claim = {
   text: string
   source: string
@@ -48,9 +50,40 @@ type Creator = {
   slug: string
 }
 
+type ApiNarrativesResponse = {
+  slug: string
+  narrative_id: string
+  video_id: string
+  destination: string
+  channel_id: string
+  narrative_text: string
+  date: string
+  claims: [
+    {
+      claim_text: string,
+      claim_risk: "Low" | "Medium" | "High",
+      source: string,
+      date: string
+    }
+  ],
+  metadata: {
+    tags: [],
+    sentiment_score: null,
+    sentiment: null,
+    title: "",
+    upload_date: "",
+    webpage_url: "",
+    risk_callouts: []
+  },
+  video_stats: {
+    view_count: number | null,
+    like_count: number | null,
+    comment_count: number | null
+  }
+}
 
 
-const sentimentChip = (sentiment: NarrativeDetail["sentiment"]) => {
+const sentimentChip = (sentiment: "positive" | "neutral" | "negative" | null) => {
   if (sentiment === "positive") return "text-emerald-300 bg-emerald-400/10"
   if (sentiment === "negative") return "text-rose-300 bg-rose-400/10"
   return "text-amber-200 bg-amber-400/10"
@@ -59,16 +92,14 @@ const sentimentChip = (sentiment: NarrativeDetail["sentiment"]) => {
 type Params = { params: Promise<{ slug: string }> }
 
 export default async function NarrativeDetailPage({ params }: Params) {
-
-  
   const { slug } = await params;
-  
-  const res = await fetch(`/api/narratives/${slug}`)
+  // use API_BASE since its a server component
+  const res = await fetch(`${API_BASE}/api/narratives/enriched/video_details/${slug}`, { cache: "no-store" })
   if (!res.ok) {
     console.error(`Failed to fetch detailed narrative ${slug}:`, res.statusText);
     notFound();
   }
-  const narrative = await res.json();
+  const narrative: ApiNarrativesResponse = await res.json();
   console.log("Fetched narrative detail:", narrative);
 
   return (
@@ -79,49 +110,49 @@ export default async function NarrativeDetailPage({ params }: Params) {
             Narratives
           </Link>
           <span>›</span>
-          <span className="text-gray-200">{narrative.title}</span>
+          <span className="text-gray-200">{narrative.narrative_text}</span>
         </div>
 
         <header className="space-y-4">
           <div className="flex flex-wrap items-center gap-3">
-            {/* <span className={`rounded-full px-3 py-1 text-xs ${sentimentChip(narrative.sentiment)}`}>
-              {narrative.sentiment}
-            </span> */}
-            {/* <span className="rounded-full bg-white/10 text-gray-200 px-3 py-1 text-xs border border-white/10">
-              {narrative.velocity}
-            </span> */}
-            {/* <span className="rounded-full bg-white/10 text-gray-200 px-3 py-1 text-xs border border-white/10">
-              {narrative.creatorsCount} creators
-            </span> */}
-            {/* <span className="rounded-full bg-white/10 text-gray-200 px-3 py-1 text-xs border border-white/10">
-              {narrative.videosAnalyzed} videos analyzed
-            </span> */}
+            <span className={`rounded-full px-3 py-1 text-xs ${sentimentChip(narrative.metadata?.sentiment || "neutral")}`}>
+              {narrative.metadata?.sentiment ?? "neutral"}
+            </span>
+            <span className="rounded-full bg-white/10 text-gray-200 px-3 py-1 text-xs border border-white/10">
+              Sentiment score: {narrative.metadata?.sentiment_score ?? "—"}
+            </span>
+            <span className="rounded-full bg-white/10 text-gray-200 px-3 py-1 text-xs border border-white/10">
+              Date: {narrative.date ? new Date(narrative.date).toLocaleString() : "—"}
+            </span>
+            <span className="rounded-full bg-white/10 text-gray-200 px-3 py-1 text-xs border border-white/10">
+              Views: {narrative.video_stats?.view_count?.toLocaleString() ?? "—"}
+            </span>
           </div>
           <h3 className="text-sm uppercase tracking-[0.25em] text-gray-400">Narrative overview</h3>
-          <h1 className="text-4xl font-semibold leading-tight">{narrative.text}</h1>
+          <h1 className="text-4xl font-semibold leading-tight">{narrative.narrative_text}</h1>
           <p className="text-base text-gray-300 max-w-3xl">{narrative.destination}</p>
         </header>
 
-        {/* <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <MetricCard label="Videos analyzed" value={narrative.videosAnalyzed.toLocaleString()} />
-          <MetricCard label="Active claims" value={narrative.claimsCount.toString()} />
-          <MetricCard label="Active creators" value={narrative.creatorsCount.toString()} />
-          <MetricCard label="Sentiment" value={narrative.sentimentScore} />
-        </section> */}
+        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <MetricCard label="View Count" value={narrative.video_stats?.view_count?.toLocaleString() || "0"} />
+          <MetricCard label="Active claims" value={narrative.claims.length.toString()} />
+          <MetricCard label="Video Like Count" value={narrative.video_stats?.like_count?.toLocaleString() || "0"} />
+          <MetricCard label="Sentiment" value={narrative.metadata.sentiment_score || "Not available"} />
+        </section>
 
         <section className="space-y-3">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs uppercase tracking-[0.25em] text-gray-400">Top creators</p>
-              <p className="text-sm text-gray-400">Primary channels informing this narrative.</p>
+              <p className="text-xs uppercase tracking-[0.25em] text-gray-400">Narrative Creators</p>
+              <p className="text-sm text-gray-400">Channel informing this narrative.</p>
             </div>
-            <span className="text-xs text-gray-400">{narrative?.topCreators?.length ?? 0 } highlighted</span>
+            <span className="text-xs text-gray-400">1 highlighted</span>
           </div>
           <div className="flex flex-wrap gap-2">
             {/* {narrative.topCreators.map((creator) => ( */}
-              <Link href={`/creators/${narrative.channel_id.slug}`} key={narrative.channel_id.slug} className="hover:underline hover:underline-offset-4">
+              <Link href={`/creators/${narrative.channel_id}`} key={narrative.channel_id} className="hover:underline hover:underline-offset-4">
                 <span className="rounded-full bg-white/5 border border-white/10 px-3 py-2 text-xs text-gray-200">
-                  {narrative.creator_name}
+                  {narrative.channel_id}
                 </span>
               </Link>
              {/* ))} */}
@@ -134,11 +165,11 @@ export default async function NarrativeDetailPage({ params }: Params) {
               <p className="text-xs uppercase tracking-[0.25em] text-gray-400">Claims carousel</p>
               <p className="text-sm text-gray-400">High-signal claims clustered for this narrative.</p>
             </div>
-            <span className="text-xs text-gray-400">{narrative?.related_claims?.length ?? 0} shown</span>
+            <span className="text-xs text-gray-400">{narrative?.claims?.length ?? 0} shown</span>
           </div>
 
           <div className="flex gap-4 overflow-x-auto pb-2">
-            {narrative.related_claims.map((claim, idx) => (
+            {narrative.claims.map((claim, idx) => (
               <div
                 key={idx}
                 className="min-w-[240px] max-w-[260px] rounded-2xl border border-white/10 bg-gradient-to-b from-[#151525] via-[#11111a] to-[#0c0c12] p-4 shadow-lg shadow-black/40"
@@ -148,15 +179,16 @@ export default async function NarrativeDetailPage({ params }: Params) {
                   <p><span className="text-gray-500">Source:</span> {claim.source}</p>
                   <p><span className="text-gray-500">Risk:</span> {claim.claim_risk}</p>
                   <p><span className="text-gray-500">Date:</span> {claim.date}</p>
-                  {/* <p><span className="text-gray-500">Engagement:</span> {claim.engagement}</p>
-                  <p><span className="text-gray-500">Growth:</span> {claim.growth}</p> */}
+                  {/* <p><span className="text-gray-500">Engagement:</span> {claim.engagement}</p> */}
+                  {/* <p><span className="text-gray-500">Growth:</span> {claim.growth}</p> */}
                 </div>
               </div>
             ))}
           </div>
         </section>
 
-        <section className="space-y-3">
+
+        {/* <section className="space-y-3">
             <div className="flex items-center justify-between">
             <div>
               <p className="text-xs uppercase tracking-[0.25em] text-gray-400">Related Videos</p>
@@ -171,7 +203,7 @@ export default async function NarrativeDetailPage({ params }: Params) {
                 className="min-w-[260px] max-w-[280px] rounded-2xl border border-white/10 bg-gradient-to-b from-[#151525] via-[#11111a] to-[#0c0c12] shadow-lg shadow-black/40 overflow-hidden"
               >
                 <div className="h-40 w-full bg-gray-800 overflow-hidden">
-                  {/* <img src={video.thumb} alt={video.title} className="h-full w-full object-cover" /> */}
+                  <img src={video.thumb} alt={video.title} className="h-full w-full object-cover" />
                 </div>
                 <div className="p-4 space-y-2">
                   <p className="text-sm font-semibold text-white line-clamp-2">{claim.claim_text}</p>
@@ -182,7 +214,7 @@ export default async function NarrativeDetailPage({ params }: Params) {
               </div>
             ))}
           </div>
-        </section>
+        </section> */}
       </div>
     </div>
   )

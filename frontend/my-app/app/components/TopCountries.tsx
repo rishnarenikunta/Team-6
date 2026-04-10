@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 interface Destination {
   name: string;
@@ -20,7 +19,7 @@ const TopCountries = () => {
   useEffect(() => {
     async function fetchDestinations() {
       try {
-        const res = await fetch(`${API_BASE}/api/destinations/top`);
+        const res = await fetch(`/api/destinations/top`);
         if (!res.ok) throw new Error(`API ${res.status}`);
         const data: Destination[] = await res.json();
         setDestinations(data);
