@@ -8,8 +8,8 @@ on:
       - 'backend/**' # Only triggers if backend files change
 
 env:
-  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-  REGION: ${{ secrets.GCP_REGION }}
+  PROJECT_ID: 'youtravel-487521'
+  REGION: 'us-central1'
 
 jobs:
   deploy-backend:
@@ -25,8 +25,8 @@ jobs:
       - name: Authenticate to GCP
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
-          service_account: ${{ secrets.SA_EMAIL }}
+          workload_identity_provider: 'projects/528253522819/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider'
+          service_account: 'github-actions-sa@youtravel-487521.iam.gserviceaccount.com'
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2

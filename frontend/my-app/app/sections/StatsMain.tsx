@@ -11,7 +11,6 @@ export interface CreatorTierBreakdown {
   pct: number;
 }
 
-
 export interface CreatorInsights {
   total: number;
   tiers: {
