@@ -665,6 +665,10 @@ def top_20_videos_by_bucket_store(
                 vid = v["video_id"]
                 print(f"[STORE {idx}/{len(top20)}] {vid}")
 
+                if metadata_col is not None and metadata_col.find_one({"_id": vid}):
+                    print(f"[SKIP] {vid} already in metadata, skipping")
+                    continue
+
                 gcs_path = None
                 try:
                     transcript_result = get_transcript(vid)
