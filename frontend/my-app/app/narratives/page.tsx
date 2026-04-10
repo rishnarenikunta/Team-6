@@ -10,13 +10,15 @@ type Narrative = {
   sentiment: "positive" | "neutral" | "negative"
   velocity: string
   creators: string
-  watchtime: string
+  date: string
   claim: string
   risk: string
   tags: string[]
 }
 
-const narratives: Narrative[] = [
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+
+const fallbackNarratives: Narrative[] = [
   {
     slug: "slow-travel-japan-countryside",
     title: "Slow travel in Japan’s countryside",
@@ -24,11 +26,12 @@ const narratives: Narrative[] = [
     sentiment: "positive",
     velocity: "+18% week-over-week",
     creators: "72 active creators",
-    watchtime: "3.4M hrs past 30d",
+    date: "2023-10-01",
     claim: "Rural rail passes and farm-stays are beating city itineraries for engagement.",
     risk: "Low creator risk",
     tags: ["slow travel", "rail", "food", "autumn"],
-  }]
+  },
+]
 
 const sentimentChip = (sentiment: Narrative["sentiment"]) => {
   if (sentiment === "positive") return "text-emerald-300 bg-emerald-400/10"
@@ -70,23 +73,26 @@ useEffect(() => {
       const res = await fetch(`/api/narratives`);
       if (!res.ok) throw new Error(`API error ${res.status}`);
       const data: ApiNarrativesResponse = await res.json();
-
+      console.log("Fetched narratives:", data);
       const mapped: Narrative[] = data.items.map((item) => ({
-        slug: item.narrative_id,
+        slug: item.slug || item.narrative_id || String(item.id),
         title: item.text,                 // or item.destination, or truncate(item.text)
         region: item.destination ?? "—",
         sentiment: "neutral",             // until the API provides sentiment
         velocity: "—",
         creators: item.creator_name || "Unknown creator",
-        watchtime: "—",
+        date: item.date,
         claim: item.text,
         risk: "—",
         tags: [],                         // populate when API includes tags
       }));
 
-      if (!cancelled) setNarratives(mapped);
+      if (!cancelled) setNarratives(mapped.length ? mapped : fallbackNarratives);
     } catch (err) {
-      if (!cancelled) setError("Failed to fetch narratives");
+      if (!cancelled) {
+        setError("Failed to fetch narratives");
+        setNarratives(fallbackNarratives);
+      }
       console.error(err);
     } finally {
       if (!cancelled) setLoading(false);
@@ -166,7 +172,7 @@ useEffect(() => {
 
           <div className="grid gap-4 md:grid-cols-2">
             {visible.map((narrative) => (
-              <Link key={narrative.title} href={`/narratives/${narrative.slug}`} className="block group">
+              <Link key={narrative.slug} href={`/narratives/${narrative.slug}`} className="block group">
                 <article className="relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-[#1d1525] via-[#10101a] to-[#0c0c12] p-5 transition hover:-translate-y-1 hover:border-white/25 hover:shadow-2xl hover:shadow-black/50">
                   <div className="flex items-start justify-between gap-3">
                     <div className="space-y-1">
@@ -191,12 +197,12 @@ useEffect(() => {
 
                   <div className="mt-5 grid grid-cols-2 gap-3 text-xs text-gray-300">
                     <div className="rounded-xl bg-white/5 px-3 py-2 border border-white/10">
-                      <p className="text-[10px] uppercase tracking-wide text-gray-400">Creator mix</p>
+                      <p className="text-[10px] uppercase tracking-wide text-gray-400">Creator Name</p>
                       <p className="font-medium">{narrative.creators}</p>
                     </div>
                     <div className="rounded-xl bg-white/5 px-3 py-2 border border-white/10">
-                      <p className="text-[10px] uppercase tracking-wide text-gray-400">Watchtime</p>
-                      <p className="font-medium">{narrative.watchtime}</p>
+                      <p className="text-[10px] uppercase tracking-wide text-gray-400">Date</p>
+                      <p className="font-medium">{narrative.date}</p>
                     </div>
                     <div className="rounded-xl bg-white/5 px-3 py-2 border border-white/10">
                       <p className="text-[10px] uppercase tracking-wide text-gray-400">Risk</p>

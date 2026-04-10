@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pymongo import MongoClient
-from typing import Any
+from typing import Any, Optional
 
 load_dotenv()
 
@@ -95,7 +95,7 @@ def get_trending_narratives() -> list[dict[str, Any]]:
     return result
 
 @app.get("/api/destinations")
-def get_destinations(region: str | None = None, tag: str | None = None) -> list[dict[str, Any]]:
+def get_destinations(region: Optional[str]= None, tag: Optional[str]= None) -> list[dict[str, Any]]:
 
     REGIONS: dict[str, list[str]] = {
         "asia":     ["Japan", "South Korea", "Thailand", "Vietnam"],
@@ -319,7 +319,7 @@ def get_main_stats() -> dict[str, Any]:
 
 @app.get("/api/narratives")
 def list_narratives(
-    destination: str | None = None,
+    destination: Optional[str]= None,
     limit: int = 20,
     offset: int = 0,
 ) -> dict[str, Any]:
@@ -361,11 +361,9 @@ def list_narratives(
 
 # ── /api/narratives/{slug} ───────────────────────────────────────────────────
 # Powers /narratives/[slug]/page.tsx — single narrative detail
-
 @app.get("/api/narratives/{slug}")
 def get_narrative_detail(slug: str) -> dict[str, Any]:
 
-    # slug = narrative_id value (e.g. "narr_kyoto_01")
     doc = db["narratives"].find_one(
         {"narrative_id": slug},
         {"narrative_vector": 0},
@@ -378,7 +376,13 @@ def get_narrative_detail(slug: str) -> dict[str, Any]:
 
     creator = db["creators"].find_one({"channel_id": channel_id}, {"_id": 0}) or {}
 
-    # Related claims for the same destination
+    # ── Fetch video metadata using video_id from the narrative ────────────────
+    video_id = doc.get("video_id", "")
+    meta = db["metadata"].find_one(
+        {"video_id": video_id},
+        {"_id": 0, "webpage_url": 1, "views": 1, "upload_date": 1, "channel_url": 1}
+    ) or {}
+
     related_claims = list(
         db["claims"].find(
             {"destination": destination},
@@ -386,18 +390,16 @@ def get_narrative_detail(slug: str) -> dict[str, Any]:
         ).limit(10)
     )
 
-    # Top cluster result for this destination (if available)
     cluster = db["top_narratives"].find_one({
         "destination_id": destination,
         "scope_type": "destination",
         "content_type": "narratives",
     })
 
-    # Other narratives for same destination (siblings)
     siblings = list(
         db["narratives"].find(
             {"destination": destination, "narrative_id": {"$ne": slug}},
-            {"narrative_vector": 0, "_id": 0, "narrative_id": 1, "narrative_text": 1},
+            {"narrative_id": 1, "narrative_text": 1},
         ).limit(5)
     )
 
@@ -419,6 +421,12 @@ def get_narrative_detail(slug: str) -> dict[str, Any]:
             {"slug": s["narrative_id"], "text": s["narrative_text"]}
             for s in siblings
         ],
+        # ── video fields from metadata collection ─────────────────────────────
+        "video_id":        video_id,
+        "video_url":       meta.get("webpage_url", ""),
+        "video_views":     meta.get("views", 0),
+        "video_published": meta.get("upload_date", ""),   # keep as-is (likely already a string like "20240101")
+        "video_channel":   meta.get("channel_url", ""),
     }
 
 

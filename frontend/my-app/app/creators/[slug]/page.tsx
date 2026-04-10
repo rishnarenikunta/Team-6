@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { notFound } from "next/navigation"
 
 type ContentCreator = {
   slug: string
@@ -17,204 +18,31 @@ type ContentCreator = {
   risk: RiskStats[]
 }
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+
 type RiskStats = {
   riskTitle: string
   riskDescription: string
 }
 
-const creators: ContentCreator[] = [
-  {
-    slug: "trail-theory",
-    name: "Nicole Laena",
-    region: "EMEA",
-    domain: "Day in my life + travel",
-    subscribers: 3200000,
-    monthlyViews: 18000000,
-    contentType: "Travel",
-    commentVolume30d: 18400,
-    sentiment: { positive: 71, neutral: 23, negative: 6 },
-    topThemes: ["italy tourism", "day in my life", "lightweight coffee setups"],
-    highlightedComments: [
-      "Gear lists are actually realistic—no fluff, just what works on trail.",
-      "Appreciate the wet-weather tests before I buy anything.",
-    ],
-    risk: [
-      { riskTitle: "Avg. Sentiment",
-        riskDescription: "+68% positive"
-      },
-      {
-        riskTitle: "Risk Band",
-        riskDescription: "Low"
-      }
-    ],
-    videos: [
-      { title: "3-day loop with a 9lb pack", views: "2.1M views", img: "/images/trail-theory-1.png", link: "https://www.youtube.com/watch?v=w6FylJ9I7M8" },
-      { title: "Rain test: budget shells vs Gore-Tex", views: "1.4M views", img: "/images/trail-theory-2.png", link: "/videos/trail-theory-2" },
-      { title: "Caffeine & camp stoves showdown", views: "940k views", img: "/images/trail-theory-3.png", link: "/videos/trail-theory-3" },
-    ],
-    profilePhoto: "/images/trail-theory.png",
-  },
-  {
-    slug: "canyon-coffee",
-    name: "Canyon & Coffee",
-    region: "Americas",
-    domain: "Weekend hikes & campsite coffee rituals",
-    subscribers: 420000,
-    monthlyViews: 5600000,
-    contentType: "Travel",
-    commentVolume30d: 7600,
-    sentiment: { positive: 64, neutral: 28, negative: 8 },
-    topThemes: ["coffee recipes", "budget gear", "beginner routes"],
-    risk: [
-      {
-        riskTitle: "Avg. Sentiment",
-        riskDescription: "+64% positive"
-      },
-      {
-        riskTitle: "Risk Band",
-        riskDescription: "Low"
-      }
-    ],
-    highlightedComments: [
-      "Love that you include brew temps—helps me replicate the coffee on trail!",
-      "Please keep the under-$50 gear recs coming, super helpful.",
-    ],
-    videos: [
-      { title: "Sedona sunrise + AeroPress kit", views: "620k views", img: "/images/canyon-coffee-1.jpg", link: "/videos/canyon-coffee-1" },
-      { title: "Overnight pack list under 20 lbs", views: "510k views", img: "/images/canyon-coffee-2.jpg", link: "/videos/canyon-coffee-2" },
-      { title: "Budget trail runners vs boots", views: "430k views", img: "/images/canyon-coffee-3.jpg", link: "/videos/canyon-coffee-3" },
-    ],
-    profilePhoto: "/images/canyon-coffee-1.jpg",
-  },
-  {
-    slug: "metro-bites",
-    name: "MetroBites",
-    region: "EMEA",
-    domain: "City food crawls & night markets",
-    subscribers: 980000,
-    monthlyViews: 13200000,
-    contentType: "Food",
-    commentVolume30d: 15200,
-    sentiment: { positive: 69, neutral: 21, negative: 10 },
-    topThemes: ["maps & price notes", "late-night options", "street food hygiene"],
-    highlightedComments: [
-      "Maps + prices in the description are clutch for planning trips.",
-      "Thanks for including veggie options—super helpful.",
-    ],
-    risk: [
-      {
-        riskTitle: "Avg. Sentiment",
-        riskDescription: "+69% positive"
-      },
-      {
-        riskTitle: "Risk Band",
-        riskDescription: "Low"
-      }
-    ],
-    videos: [
-      { title: "72 hours eating Lisbon", views: "1.1M views", img: "/images/metro-bites-1.jpg", link: "/videos/metro-bites-1" },
-      { title: "Late-night kebabs in Berlin", views: "870k views", img: "/images/metro-bites-2.jpg", link: "/videos/metro-bites-2" },
-      { title: "Street food price check: Athens", views: "740k views", img: "/images/metro-bites-3.jpg", link: "/videos/metro-bites-3" },
-    ],
-    profilePhoto: "/images/metro-bites-1.jpg",
-  },
-  {
-    slug: "signal-skyline",
-    name: "Signal & Skyline",
-    region: "APAC",
-    domain: "Drone city guides & skyline walks",
-    subscribers: 1560000,
-    monthlyViews: 21000000,
-    contentType: "Lifestyle/Vlog",
-    commentVolume30d: 23800,
-    sentiment: { positive: 73, neutral: 19, negative: 8 },
-    topThemes: ["route planning", "budget tips", "camera gear"],
-    highlightedComments: [
-      "These aerial routes made my Seoul trip—followed them step for step!",
-      "Please keep adding transit notes, super helpful at night.",
-    ],
-    risk: [
-      {
-        riskTitle: "Avg. Sentiment",
-        riskDescription: "+73% positive"
-      },
-      {
-        riskTitle: "Risk Band",
-        riskDescription: "Low"
-      }
-    ],
-    videos: [
-      { title: "Seoul night markets from above", views: "2.4M views", img: "/images/signal-skyline-1.jpg", link: "/videos/signal-skyline-1" },
-      { title: "Tokyo rail loop in 12 minutes", views: "1.9M views", img: "/images/signal-skyline-2.jpg", link: "/videos/signal-skyline-2" },
-      { title: "Bangkok rooftops on a budget", views: "1.2M views", img: "/images/signal-skyline-3.jpg", link: "/videos/signal-skyline-3" },
-    ],
-    profilePhoto: "/images/signal-skyline-1.jpg",
-  },
-  {
-    slug: "carry-on-lab",
-    name: "Carry-On Lab",
-    region: "EMEA",
-    domain: "Carry-on packing science & gear reviews",
-    subscribers: 310000,
-    monthlyViews: 4100000,
-    contentType: "Tech",
-    commentVolume30d: 4200,
-    sentiment: { positive: 61, neutral: 30, negative: 9 },
-    topThemes: ["small-frame fit", "compression tests", "budget picks"],
-    highlightedComments: [
-      "Finally someone measures fit + straps for smaller frames—instant subscribe.",
-      "Compression cube tests were more helpful than most blog posts.",
-    ],
-    risk: [
-      {
-        riskTitle: "Avg. Sentiment",
-        riskDescription: "+61% positive"
-      },
-      {
-        riskTitle: "Risk Band",
-        riskDescription: "Low"
-      }
-    ],
-    videos: [
-      { title: "Backpack stress test: 7 brands", views: "360k views", img: "/images/carry-on-lab-1.jpg", link: "/videos/carry-on-lab-1" },
-      { title: "Capsule wardrobe for 10 days", views: "290k views", img: "/images/carry-on-lab-2.jpg", link: "/videos/carry-on-lab-2" },
-      { title: "Noise-cancelling showdown", views: "270k views", img: "/images/carry-on-lab-3.jpg", link: "/videos/carry-on-lab-3" },
-    ],
-    profilePhoto: "/images/carry-on-lab-1.jpg",
-  },
-  {
-    slug: "coastal-signals",
-    name: "Coastal Signals",
-    region: "APAC",
-    domain: "Surf towns, ferries, and coastal routes",
-    subscribers: 640000,
-    monthlyViews: 9200000,
-    contentType: "Travel",
-    commentVolume30d: 9800,
-    sentiment: { positive: 67, neutral: 24, negative: 9 },
-    topThemes: ["ferry timing", "budget stays", "surf conditions"],
-    highlightedComments: [
-      "Appreciate the ferry schedules + budget hotels in one place—saved so much time.",
-      "Clear on surf seasons; helped me move my trip earlier.",
-    ],
-    risk: [
-      {
-        riskTitle: "Avg. Sentiment",
-        riskDescription: "+67% positive"
-      },
-      {
-        riskTitle: "Risk Band",
-        riskDescription: "Low"
-      }
-    ],
-    videos: [
-      { title: "Island-hop Japan by ferry", views: "780k views", img: "/images/coastal-signals-1.jpg", link: "/videos/coastal-signals-1" },
-      { title: "Cheap surf week in Taiwan", views: "620k views", img: "/images/coastal-signals-2.jpg", link: "/videos/coastal-signals-2" },
-      { title: "Waterproof bags that actually seal", views: "510k views", img: "/images/coastal-signals-3.jpg", link: "/videos/coastal-signals-3" },
-    ],
-    profilePhoto: "/images/coastal-signals-1.jpg",
-  },
-]
+type ApiContentCreator = {
+  channel_id: string
+  name: string
+  subscriber_count: number
+  views: number
+  join_date?: string
+  top_claim?: string | null
+  cluster_size?: number | null
+  computed_at?: string | null
+  claims?: {
+    destination: string
+    claim_text: string
+    claim_risk: string
+    date: string
+  }[]
+}
+
+const creators: ContentCreator[] = []
 
 const formatNumber = (value: number) =>
   value.toLocaleString("en-US", { notation: "compact", maximumFractionDigits: 1 })
@@ -223,16 +51,30 @@ type Params = { params: Promise<{ slug: string }> }
 
 export default async function CreatorDetailPage({ params }: Params) {
   const { slug } = await params
-  const creator = creators.find((c) => c.slug === slug)
-  const avatar = creator?.profilePhoto ?? creator?.videos[0]?.img ?? ""
+
+  let creator: ContentCreator | undefined
+
+  try {
+    const res = await fetch(`${API_BASE}/api/creators/${slug}`, { cache: "no-store" })
+    if (res.ok) {
+      const apiCreator: ApiContentCreator = await res.json()
+      creator = mapApiCreatorToContentCreator(apiCreator)
+      console.log("Fetched creator from API:", creator)
+    }
+  } catch (err) {
+    console.error(`Failed to fetch creator ${slug}:`, err)
+  }
+
+  // Fallback to static seed data if API is missing
+  if (!creator) {
+    creator = creators.find((c) => c.slug === slug)
+  }
 
   if (!creator) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-[#0b0b10] via-[#0f1018] to-[#0b0b10] text-white flex items-center justify-center">
-        <p className="text-gray-300">Creator not found.</p>
-      </div>
-    )
+    notFound()
   }
+
+  const avatar = creator.profilePhoto ?? creator.videos[0]?.img ?? ""
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#0b0b10] via-[#0f1018] to-[#0b0b10] text-white">
@@ -399,4 +241,53 @@ function SentimentRow({ label, value, color }: { label: string; value: number; c
       </div>
     </div>
   )
+}
+
+function mapApiCreatorToContentCreator(api: ApiContentCreator): ContentCreator {
+  const defaultSentiment = { positive: 60, neutral: 30, negative: 10 }
+  const claims = api.claims ?? []
+  const topThemes =
+    claims.length > 0
+      ? Array.from(new Set(claims.map((c) => c.destination || "Travel"))).slice(0, 6)
+      : ["Travel"]
+  const highlightedComments =
+    claims.length > 0
+      ? claims.slice(0, 2).map((c) => c.claim_text)
+      : ["No highlighted comments."]
+  const videos =
+    claims.length > 0
+      ? claims.slice(0, 3).map((c) => ({
+          title: c.claim_text,
+          views: `${formatNumber(api.views ?? 0)} views`,
+          img: "/images/placeholder.jpg",
+          link: "#",
+        }))
+      : [
+          {
+            title: api.top_claim || "Recent upload",
+            views: `${formatNumber(api.views ?? 0)} views`,
+            img: "/images/placeholder.jpg",
+            link: "#",
+          },
+        ]
+
+  return {
+    slug: api.channel_id ?? "unknown",
+    name: api.name ?? "Unknown creator",
+    region: "Americas",
+    domain: "Travel creator",
+    subscribers: api.subscriber_count ?? 0,
+    monthlyViews: api.views ?? 0,
+    contentType: "Travel",
+    videos: videos.length > 0 ? videos : [],
+    profilePhoto: undefined,
+    commentVolume30d: api.cluster_size ?? 0,
+    sentiment: defaultSentiment,
+    topThemes,
+    highlightedComments: highlightedComments.length > 0 ? highlightedComments : ["No highlighted comments."],
+    risk: [
+      { riskTitle: "Avg. Sentiment", riskDescription: "+60% positive" },
+      { riskTitle: "Risk Band", riskDescription: "Low" },
+    ],
+  }
 }
