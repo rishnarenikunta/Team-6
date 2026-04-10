@@ -14,6 +14,7 @@ RUN npm ci
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
+COPY . .
 
 # ENV VAR for NExT.JS API URL (can be overridden at runtime)
 ARG NEXT_PUBLIC_API_URL
