@@ -6,30 +6,30 @@ import { useEffect, useState } from "react"
 type Narrative = {
   slug: string
   title: string
-  region: string
   sentiment: "positive" | "neutral" | "negative"
-  velocity: string
+  sentiment_score: number
   creators: string
   date: string
   claim: string
   risk: string
   tags: string[]
+  destination?: string
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+// const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 const fallbackNarratives: Narrative[] = [
   {
-    slug: "slow-travel-japan-countryside",
-    title: "Slow travel in Japan’s countryside",
-    region: "APAC",
-    sentiment: "positive",
-    velocity: "+18% week-over-week",
-    creators: "72 active creators",
-    date: "2023-10-01",
-    claim: "Rural rail passes and farm-stays are beating city itineraries for engagement.",
-    risk: "Low creator risk",
-    tags: ["slow travel", "rail", "food", "autumn"],
+    slug: "fallback",
+    title: "Narratives unavailable",
+    sentiment: "neutral",
+    sentiment_score: 0,
+    creators: "N/A",
+    date: "—",
+    claim: "No narratives could be loaded from the API.",
+    risk: "—",
+    tags: [],
+    destination: "—",
   },
 ]
 
@@ -41,21 +41,26 @@ const sentimentChip = (sentiment: Narrative["sentiment"]) => {
 
 export default function NarrativePage() {
 
-  type ApiNarrativesResponse = {
-  total: number;
-  offset: number;
-  limit: number;
-  items: {
-    id: string;
-    narrative_id: string;
+  type ApiNarrativeItem = {
     slug: string;
-    text: string;
+    narrative_id: string;
+    video_id: string;
     destination: string;
-    date: string;
     channel_id: string;
-    creator_name: string;
-  }[];
-};
+    narrative_text: string;
+    date: string;
+    claims: { claim_text?: string; claim_risk?: string }[];
+    metadata: {
+      tags: string[];
+      sentiment_score: number | null;
+      sentiment: "positive" | "neutral" | "negative" | null;
+      title: string;
+      upload_date: string;
+      webpage_url: string;
+    };
+  };
+
+  type ApiNarrativesResponse = ApiNarrativeItem[];
 
 const [narratives, setNarratives] = useState<Narrative[]>([]);
 const [loading, setLoading] = useState(true);
@@ -70,21 +75,25 @@ useEffect(() => {
   async function fetchNarratives() {
     try {
       setError(null);
-      const res = await fetch(`/api/narratives`);
+      const res = await fetch(`/api/narratives/enriched`);
       if (!res.ok) throw new Error(`API error ${res.status}`);
       const data: ApiNarrativesResponse = await res.json();
       console.log("Fetched narratives:", data);
-      const mapped: Narrative[] = data.items.map((item) => ({
-        slug: item.slug || item.narrative_id || String(item.id),
-        title: item.text,                 // or item.destination, or truncate(item.text)
-        region: item.destination ?? "—",
-        sentiment: "neutral",             // until the API provides sentiment
-        velocity: "—",
-        creators: item.creator_name || "Unknown creator",
-        date: item.date,
-        claim: item.text,
+      const mapped: Narrative[] = data.map((item) => ({
+        slug: item.slug || item.narrative_id,
+        title: item.narrative_text,                 // or item.destination, or truncate(item.text)
+        sentiment: item.metadata.sentiment || "neutral",
+        sentiment_score: item.metadata.sentiment_score || 0,
+        creators: item.channel_id || "Unknown creator",
+        date: item.date
+          ? new Date(item.date).toLocaleString()
+          : item.metadata.upload_date
+            ? new Date(item.metadata.upload_date).toLocaleDateString()
+            : "Unknown date",
+        claim: item.claims.length > 0 ? (item.claims[0].claim_text || item.claims[0].text || "No claim text") : "No claims identified",
         risk: "—",
-        tags: [],                         // populate when API includes tags
+        tags: item.metadata.tags || [],                         // populate when API includes tags
+        destination: item.destination || "Unknown destination",
       }));
 
       if (!cancelled) setNarratives(mapped.length ? mapped : fallbackNarratives);
@@ -107,7 +116,6 @@ useEffect(() => {
     const term = searchTerm.trim().toLowerCase();
     if (!term) return true;
     return (
-      n.region.toLowerCase().includes(term) ||
       n.title.toLowerCase().includes(term)
     );
   });
@@ -177,15 +185,45 @@ useEffect(() => {
                   <div className="flex items-start justify-between gap-3">
                     <div className="space-y-1">
                       <h3 className="text-xl font-semibold group-hover:text-white">{narrative.title}</h3>
-                      <p className="text-sm text-gray-400">{narrative.region}</p>
+                      <p className="text-sm text-gray-400">Narrative Destination: {narrative.destination}</p>
                     </div>  
                     <span className={`rounded-full px-3 py-1 text-xs ${sentimentChip(narrative.sentiment)}`}>
                       {narrative.sentiment}
                     </span>
                   </div>
 
-                  <p className="mt-3 text-sm text-blue-200">{narrative.velocity}</p>
-                  <p className="mt-2 text-sm text-gray-200">{narrative.claim}</p>
+                  <div className="mt-3 space-y-2">
+                    <div className="flex items-center gap-3 text-xs text-gray-300">
+                      <span className="uppercase tracking-[0.12em] text-[11px] text-gray-400">Sentiment score</span>
+                      <div className="flex-1 h-2 rounded-full bg-white/10 overflow-hidden">
+                        <div
+                          className="h-full transition-all"
+                          style={{
+                            width: `${Math.min(100, Math.max(0, narrative.sentiment_score * 100)).toFixed(0)}%`,
+                            background:
+                              narrative.sentiment === "positive"
+                                ? "linear-gradient(90deg, #34d399, #10b981)"
+                                : narrative.sentiment === "negative"
+                                  ? "linear-gradient(90deg, #fb7185, #f43f5e)"
+                                  : "linear-gradient(90deg, #facc15, #fbbf24)",
+                          }}
+                        />
+                      </div>
+                      <span className="text-sm font-semibold text-white">
+                        {narrative.sentiment_score.toFixed(2)}
+                      </span>
+                    </div>
+
+                    <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 shadow-inner shadow-black/30">
+                      <div className="flex items-center justify-between text-xs text-gray-400">
+                        <span className="uppercase tracking-[0.15em]">Lead claim</span>
+                        <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-gray-200">
+                          {narrative.risk || "—"}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-sm text-gray-100 leading-relaxed">“{narrative.claim}”</p>
+                    </div>
+                  </div>
 
                   <div className="mt-4 flex flex-wrap gap-2 text-[11px] uppercase tracking-wide text-gray-300">
                     {narrative.tags.map((tag) => (
