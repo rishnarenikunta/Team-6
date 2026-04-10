@@ -11,9 +11,15 @@ load_dotenv()
 
 app = FastAPI(title="Travel App API")
 
+live_frontend = os.getenv("FRONTEND_URL")
+
+origins = ["http://localhost:3000"]
+if live_frontend:
+    origins.append(live_frontend)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
