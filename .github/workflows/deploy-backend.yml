@@ -47,5 +47,3 @@ jobs:
           image: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/backend-repo/my-api:${{ github.sha }}
           region: ${{ env.REGION }}
           flags: '--allow-unauthenticated'
-          env_vars: |
-            MONGODB_URI=${{ secrets.MONGODB_URI }}

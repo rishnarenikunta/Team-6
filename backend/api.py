@@ -12,7 +12,6 @@ load_dotenv()
 app = FastAPI(title="Travel App API")
 
 live_frontend = os.getenv("FRONTEND_URL")
-
 origins = ["http://localhost:3000"]
 if live_frontend:
     origins.append(live_frontend)
