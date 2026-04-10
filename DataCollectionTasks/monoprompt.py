@@ -1,11 +1,12 @@
 # main.py
 
 import os
+import time
 from dotenv import load_dotenv
 
 from typing import List, Dict, Any, Optional
 from google import genai  # pip install google-genai
-from google.genai import types
+from google.genai import types, errors
 
 from pydantic import BaseModel, Field
 
@@ -19,17 +20,61 @@ from google.cloud import storage
 from pymongo import MongoClient
 
 load_dotenv()
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+# Accept a comma-separated list of keys, fallback to single key if that's what exists
+GEMINI_KEYS_ENV = os.getenv("GEMINI_API_KEYS") or os.getenv("GEMINI_API_KEY")
 MONGODB_URI = os.getenv("MONGODB_URI")
 
-client = genai.Client(
-    api_key=GEMINI_API_KEY,
-  #  http_options={"api_version": "v1beta"},
-)
 
-# PRINT AVAILABLE MODELS
-# for m in client.models.list():
-#     print(m.name)
+class GeminiRotator:
+    """Manages a pool of Gemini API keys and automatically rotates them on 429 or 5xx errors."""
+    def __init__(self, keys_string: str):
+        if not keys_string:
+            raise ValueError("No Gemini keys provided in environment.")
+        self.keys = [k.strip() for k in keys_string.split(",") if k.strip()]
+        self.current_index = 0
+        self.client = genai.Client(api_key=self.keys[self.current_index])
+        print(f"[INFO] Initialized GeminiRotator with {len(self.keys)} key(s).")
+
+    def _rotate(self):
+        self.current_index = (self.current_index + 1) % len(self.keys)
+        print(f"[INFO] Rotating to Gemini API key index {self.current_index}...")
+        self.client = genai.Client(api_key=self.keys[self.current_index])
+
+    def execute_with_retry(self, action_func, max_attempts=None):
+        """Executes a function and retries on rate limits or server errors."""
+        if max_attempts is None:
+            # By default, allow enough attempts to cycle through all keys twice
+            max_attempts = len(self.keys) * 2
+
+        attempts = 0
+        while attempts < max_attempts:
+            try:
+                return action_func(self.client)
+            except errors.APIError as e:
+                # Check for 429 (Rate Limit) or 5xx (Server Errors)
+                if e.code == 429 or e.code >= 500:
+                    print(f"[WARN] API Error {e.code}: {e.message}. Rotating key...")
+                    self._rotate()
+                    attempts += 1
+                    time.sleep(1)  # Brief backoff before retrying
+                else:
+                    raise e  # Re-raise for 400 Bad Request, etc.
+            except Exception as e:
+                # Fallback for unexpected network exceptions containing the status code
+                error_str = str(e)
+                if "429" in error_str or "500" in error_str or "503" in error_str:
+                    print(f"[WARN] Caught exception with 429/5xx signature: {error_str}. Rotating key...")
+                    self._rotate()
+                    attempts += 1
+                    time.sleep(1)
+                else:
+                    raise e
+                    
+        raise RuntimeError("Max retries exhausted across all available Gemini API keys.")
+
+# Initialize the rotator
+gemini_rotator = GeminiRotator(GEMINI_KEYS_ENV)
 
 GENERATION_MODEL = "gemini-3.1-flash-lite-preview"
 TRANSCRIPT_BASE_URL = "http://localhost:8000"  # adjust if different host/port
@@ -129,11 +174,14 @@ EMBEDDING_MODEL = "models/gemini-embedding-001"
 #     emb = response.embeddings[0].values
 #     return emb
 def embed_texts(texts: List[str], model: str = EMBEDDING_MODEL) -> List[List[float]]:
-    # filter or keep blank; here we keep order and embed as-is
-    response = client.models.embed_content(
-        model=model,
-        contents=texts,
-    )
+    def action(client_instance):
+        return client_instance.models.embed_content(
+            model=model,
+            contents=texts,
+        )
+    
+    # Execute the API call through the rotator
+    response = gemini_rotator.execute_with_retry(action)
     return [e.values for e in response.embeddings]
 
 def extract_video_features_for_video(
@@ -184,15 +232,19 @@ def extract_video_features_for_video(
         "You must output your response EXACTLY matching the output JSON structure. Return ONLY valid JSON. Do not include markdown formatting like ```json or any introductory text."
     )
 
-    response = client.models.generate_content(
-        model=GENERATION_MODEL,
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json",
-            response_schema=VideoFeatures,
-            temperature=0.2 # Lower temperature for more deterministic, structured outputs
-        ),
-    )
+    def action(client_instance):
+        return client_instance.models.generate_content(
+            model=GENERATION_MODEL,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=VideoFeatures,
+                temperature=0.2 # Lower temperature for more deterministic, structured outputs
+            ),
+        )
+
+    # Execute the generation API call through the rotator
+    response = gemini_rotator.execute_with_retry(action)
 
     raw = (response.text or "").strip()
 
@@ -539,22 +591,3 @@ if __name__ == "__main__":
             print(f"[ERROR] Failed to save features to MongoDB: {e}")
     else:
         print("[WARN] MongoDB connection not established. Skipping database insertion.")
-    #sanity check for embedding vector shape : PASS
-    # vec = np.array(features["video_components"]["narratives"][0]["claims"][0]["claim_title_embedding"], dtype=float)
-    # print("Dim:", vec.shape[0])
-    # print("Min:", vec.min(), "Max:", vec.max())
-    # print("Norm:", np.linalg.norm(vec))
-    # You can still access just countries with: features["countries"]
-
-
-# TO DO
-# LATER
-    # - Add more robust error handling and logging
-    # - Consider adding a feedback loop where you can correct the model's output and have it learn from those corrections over time (e.g., using few-shot examples or fine-tuning on a labeled
-    #   dataset of travel videos with known features)
-
-# CONNECT TO EMBEDDING MODEL ... gemini 
-# use the ttext-embedding-004 model to create embeddings for the extracted features and store those embeddings in a vector database for later retrieval and similarity search.
-# features to emed: 
-# CREATE A THE EMBEDDINGS AND ADD IT TO THE FEATURES THING AS A JSON ENTRY..
-# sene a post request with video id and the features to a new endpoint in the fastapi server that will store the features in a database for later retrieval and use in a search index or something
