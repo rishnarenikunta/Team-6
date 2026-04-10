@@ -90,7 +90,7 @@ useEffect(() => {
           : item.metadata.upload_date
             ? new Date(item.metadata.upload_date).toLocaleDateString()
             : "Unknown date",
-        claim: item.claims.length > 0 ? (item.claims[0].claim_text || item.claims[0].text || "No claim text") : "No claims identified",
+        claim: item.claims.length > 0 ? (item.claims[0].claim_text || "No claim text") : "No claims identified",
         risk: "—",
         tags: item.metadata.tags || [],                         // populate when API includes tags
         destination: item.destination || "Unknown destination",
