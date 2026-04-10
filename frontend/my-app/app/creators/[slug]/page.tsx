@@ -295,51 +295,51 @@ function SentimentRow({ label, value, color }: { label: string; value: number; c
   )
 }
 
-function mapApiCreatorToContentCreator(api: ApiContentCreator): ContentCreator {
-  const defaultSentiment = { positive: 60, neutral: 30, negative: 10 }
-  const claims = api.claims ?? []
-  const topThemes =
-    claims.length > 0
-      ? Array.from(new Set(claims.map((c) => c.destination || "Travel"))).slice(0, 6)
-      : ["Travel"]
-  const highlightedComments =
-    claims.length > 0
-      ? claims.slice(0, 2).map((c) => c.claim_text)
-      : ["No highlighted comments."]
-  const videos =
-    claims.length > 0
-      ? claims.slice(0, 3).map((c) => ({
-          title: c.claim_text,
-          views: `${formatNumber(api.views ?? 0)} views`,
-          img: "/images/placeholder.jpg",
-          link: "#",
-        }))
-      : [
-          {
-            title: api.top_claim || "Recent upload",
-            views: `${formatNumber(api.views ?? 0)} views`,
-            img: "/images/placeholder.jpg",
-            link: "#",
-          },
-        ]
+// function mapApiCreatorToContentCreator(api: ApiContentCreator): ContentCreator {
+//   const defaultSentiment = { positive: 60, neutral: 30, negative: 10 }
+//   const claims = api.claims ?? []
+//   const topThemes =
+//     claims.length > 0
+//       ? Array.from(new Set(claims.map((c) => c.destination || "Travel"))).slice(0, 6)
+//       : ["Travel"]
+//   const highlightedComments =
+//     claims.length > 0
+//       ? claims.slice(0, 2).map((c) => c.claim_text)
+//       : ["No highlighted comments."]
+//   const videos =
+//     claims.length > 0
+//       ? claims.slice(0, 3).map((c) => ({
+//           title: c.claim_text,
+//           views: `${formatNumber(api.views ?? 0)} views`,
+//           img: "/images/placeholder.jpg",
+//           link: "#",
+//         }))
+//       : [
+//           {
+//             title: api.top_claim || "Recent upload",
+//             views: `${formatNumber(api.views ?? 0)} views`,
+//             img: "/images/placeholder.jpg",
+//             link: "#",
+//           },
+//         ]
 
-  return {
-    slug: api.channel_id ?? "unknown",
-    name: api.name ?? "Unknown creator",
-    region: "Americas",
-    domain: "Travel creator",
-    subscribers: api.subscriber_count ?? 0,
-    monthlyViews: api.views ?? 0,
-    contentType: "Travel",
-    videos: videos.length > 0 ? videos : [],
-    profilePhoto: undefined,
-    commentVolume30d: api.cluster_size ?? 0,
-    sentiment: defaultSentiment,
-    topThemes,
-    highlightedComments: highlightedComments.length > 0 ? highlightedComments : ["No highlighted comments."],
-    risk: [
-      { riskTitle: "Avg. Sentiment", riskDescription: "+60% positive" },
-      { riskTitle: "Risk Band", riskDescription: "Low" },
-    ],
-  }
-}
+//   return {
+//     slug: api.channel_id ?? "unknown",
+//     name: api.name ?? "Unknown creator",
+//     region: "Americas",
+//     domain: "Travel creator",
+//     subscribers: api.subscriber_count ?? 0,
+//     monthlyViews: api.views ?? 0,
+//     contentType: "Travel",
+//     videos: videos.length > 0 ? videos : [],
+//     profilePhoto: undefined,
+//     commentVolume30d: api.cluster_size ?? 0,
+//     sentiment: defaultSentiment,
+//     topThemes,
+//     highlightedComments: highlightedComments.length > 0 ? highlightedComments : ["No highlighted comments."],
+//     risk: [
+//       { riskTitle: "Avg. Sentiment", riskDescription: "+60% positive" },
+//       { riskTitle: "Risk Band", riskDescription: "Low" },
+//     ],
+//   }
+// }
