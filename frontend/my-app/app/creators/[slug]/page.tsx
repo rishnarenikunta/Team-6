@@ -3,7 +3,6 @@ import Link from "next/link"
 import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 type ApiContentCreatorResponse = {
   channel_id: string
@@ -52,7 +51,7 @@ export default function CreatorDetailPage() {
     if (!slug) return
     async function fetchCreator() {
       try {
-        const res = await fetch(`${API_BASE}/api/creators/${slug}`, { cache: "no-store" })
+        const res = await fetch(`/api/creators/${slug}`, { cache: "no-store" })
         if (!res.ok) throw new Error(`API error ${res.status}`)
         const data: ApiContentCreatorResponse = await res.json()
         if (!cancelled) setCreator(data)

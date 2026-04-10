@@ -3,7 +3,6 @@
 import Link from "next/dist/client/link"
 import { useMemo, useState, useEffect } from "react"
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 type Creator = {
   slug: string
@@ -59,7 +58,7 @@ export default function CreatorsPage() {
   useEffect(() => {
     async function fetchCreators() {
       try {
-        const res = await fetch(`${API_BASE}/api/creators`);
+        const res = await fetch(`/api/creators`);
         if (!res.ok) throw new Error(`API error ${res.status}`);
         const data: ApiCreatorsResponse[] = await res.json();
         console.log("Raw API creator data:", data);

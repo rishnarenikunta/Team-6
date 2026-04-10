@@ -33,7 +33,7 @@ export default function DestinationPage() {
     async function fetchDestination() {
       try {
         const decoded = decodeURIComponent(slug)
-        const res = await fetch(`${API_BASE}/api/destinations/${decoded}`)      
+        const res = await fetch(`/api/destinations/${decoded}`)      
         if (res.status === 404) { setNotFound(true); return }
         if (!res.ok) throw new Error(`API ${res.status}`)
         const data: Destination = await res.json()

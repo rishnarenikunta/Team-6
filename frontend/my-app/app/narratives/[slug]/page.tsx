@@ -93,7 +93,7 @@ type Params = { params: Promise<{ slug: string }> }
 
 export default async function NarrativeDetailPage({ params }: Params) {
   const { slug } = await params;
-
+  // use API_BASE since its a server component
   const res = await fetch(`${API_BASE}/api/narratives/enriched/video_details/${slug}`, { cache: "no-store" })
   if (!res.ok) {
     console.error(`Failed to fetch detailed narrative ${slug}:`, res.statusText);
