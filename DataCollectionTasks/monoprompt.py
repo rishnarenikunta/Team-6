@@ -87,7 +87,9 @@ class Claim(BaseModel):
     claim_comment_risk: str
 
 class Narrative(BaseModel):
-    narrative_title: str = Field(description="A short succint display title for the narrative")
+    narrative_title: str = Field(
+        description="A punchy, declarative statement summarizing the creator's core argument or takeaway about the location (e.g., 'British food is actually delicious' instead of 'British Food Quality')."
+    )
     narrative_description: str
     narrative_comment_summary: str
     narrative_comment_risk: str
@@ -165,9 +167,15 @@ def extract_video_features_for_video(
         "   a. Video Summary: Provide a concise, 1-2 sentence summary of what the video is about.\n"
         "   b. Destinations: Extract the primary physical countries discussed or visited in the video. Only include those that are a central topic or destination.\n"
         "   c. Overall Comment Analysis: Analyze the comments to determine the overall sentiment as a score from 0.0 to 1.0 (0.0 = very negative, 0.5 = neutral, 1.0 = very positive). Also identify any general risk callouts (e.g., hate speech, spam, widespread misinformation, dangerous acts).\n"
-        "   d. Narratives & Claims: Break down the transcript into its overarching themes or opinions about the location (Narratives). Under each Narrative, list the specific reasons or features the speaker highlights to prove that point (Claims).\n"
-        "      - CRITICAL INSTRUCTION A: DO NOT summarize the plot or recount what the speaker did chronologically (e.g., avoid 'They went to the museum and then ate dinner').\n"
-        "      - CRITICAL INSTRUCTION B: DO extract qualitative judgments and actionable insights (e.g., 'The local food scene is highly accessible for vegans,' supported by claims like 'Every restaurant had plant-based menus').\n"
+        "   d. Narratives & Claims: Break down the transcript into the creator's core arguments or specific takeaways about the location (Narratives). \n"
+        "      - CRITICAL INSTRUCTION A: The 'narrative_title' MUST be a declarative sentence or specific opinion, NOT a generic category. \n"
+        "        * BAD: 'Safety and Risk in Volatile Regions'\n"
+        "        * GOOD: 'Traveling to Cameroon during elections is extremely dangerous.'\n"
+        "        * BAD: 'Australia as a Diverse Travel Destination'\n"
+        "        * GOOD: 'Australia offers everything from urban cities to remote outbacks.'\n"
+        "      - Under each Narrative, list the specific reasons or features the speaker highlights to prove that point (Claims).\n"
+        "      - CRITICAL INSTRUCTION B: DO NOT summarize the plot or recount what the speaker did chronologically (e.g., avoid 'They went to the museum and then ate dinner').\n"
+        "      - CRITICAL INSTRUCTION C: DO extract qualitative judgments and actionable insights (e.g., 'The local food scene is highly accessible for vegans,' supported by claims like 'Every restaurant had plant-based menus').\n"
         "   e. Risk Assessment Constraint: Whenever you are asked to assess 'risk' (for the overall video, per narrative, or per claim), you MUST derive this risk by combining three factors:\n"
         "      - The sentiment of the comments regarding that specific topic.\n"
         "      - A summary of what the comments are saying about it.\n"
