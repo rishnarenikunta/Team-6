@@ -70,7 +70,7 @@ useEffect(() => {
   async function fetchNarratives() {
     try {
       setError(null);
-      const res = await fetch(`${API_BASE}/api/narratives`);
+      const res = await fetch(`/api/narratives`);
       if (!res.ok) throw new Error(`API error ${res.status}`);
       const data: ApiNarrativesResponse = await res.json();
       console.log("Fetched narratives:", data);

@@ -18,7 +18,6 @@ interface Claim {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 export default function ClaimsCarousel() {
   const carouselRef = useRef<HTMLDivElement>(null);
@@ -29,7 +28,7 @@ export default function ClaimsCarousel() {
   useEffect(() => {
     async function fetchClaims() {
       try {
-        const res = await fetch(`${API_BASE}/api/claims/trending`);
+        const res = await fetch(`/api/claims/trending`);
         if (!res.ok) throw new Error(`API error ${res.status}`);
         const data = await res.json();
         setClaims(data);

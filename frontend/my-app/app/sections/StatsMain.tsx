@@ -1,8 +1,9 @@
+"use client"
+
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import StatCard from "../components/StatCard";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 export interface CreatorTierBreakdown {
   count: number;
@@ -42,7 +43,7 @@ export default function StatsMain() {
     async function fetchStats() {
       try {
         setError(null);
-        const res = await fetch(`${API_BASE}/api/stats/main`);
+        const res = await fetch(`/api/stats/main`);
         if (!res.ok) throw new Error(`API ${res.status}`);
         const data: StatsResponse = await res.json();
         if (!cancelled) setStats(data);

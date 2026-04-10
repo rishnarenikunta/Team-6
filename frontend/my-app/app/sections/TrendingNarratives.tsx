@@ -14,8 +14,6 @@ interface Narrative {
   views: number;
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-
 export default function TrendingNarratives() {
   const [narratives, setNarratives] = useState<Narrative[]>([]);
   const [selected, setSelected] = useState<Narrative | null>(null);
@@ -23,7 +21,7 @@ export default function TrendingNarratives() {
   useEffect(() => {
     async function fetchNarratives() {
       try {
-        const res = await fetch(`${API_BASE}/api/narratives/trending`);
+        const res = await fetch(`/api/narratives/trending`);
         if (!res.ok) throw new Error(`API error ${res.status}`);
         const data: Narrative[] = await res.json();
         setNarratives(data);
