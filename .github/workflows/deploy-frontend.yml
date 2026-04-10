@@ -37,7 +37,9 @@ jobs:
       - name: Build and Push Docker Image
         run: |
           IMAGE_NAME=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/frontend-repo/my-app:${{ github.sha }}
-          docker build -t $IMAGE_NAME ./frontend/my-app
+          docker build \
+            --build-arg NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }} \
+            -t $IMAGE_NAME ./frontend/my-app
           docker push $IMAGE_NAME
 
       - name: Deploy to Cloud Run
