@@ -69,6 +69,18 @@ CHANNEL_BUCKETS: dict[str, list[str]] = {
     "Travel": [
         "https://www.youtube.com/@fearlessandfar/videos",
         "https://www.youtube.com/@drewbinsky/videos",
+        "https://www.youtube.com/@KenAbroad/videos",
+        "https://www.youtube.com/@SabbaticalTommy/videos",
+        "https://www.youtube.com/@MaxRoving/videos",
+        "https://www.youtube.com/@TheEndlessAdventure/videos",
+        "https://www.youtube.com/@EvaZuBe/videos",
+        "https://www.youtube.com/@harryjaggardtravel/videos",
+        "https://www.youtube.com/@lostleblanc/videos",
+        "https://www.youtube.com/@baldandbankrupt/videos",
+        "https://www.youtube.com/@chrisburkard/videos",
+        "https://www.youtube.com/@funforlouis/videos",
+        "https://www.youtube.com/@sealontour/videos",
+        "https://www.youtube.com/@mikeokayama/videos",
     ],
     "Food": [
         "https://www.youtube.com/@FoodNetwork/videos",
