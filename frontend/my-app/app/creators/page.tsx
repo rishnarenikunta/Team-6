@@ -34,16 +34,15 @@ type ApiCreatorsResponse = {
   subscriber_count: number
   views: number
   comment_volume: number
-  videos: [
-      {
-        video_id: string
-        title: string
-        view_count: number
-        like_count: number
-        comment_count: number
-        webpage_url: string
-        upload_date: string
-      },]
+  videos: {
+      video_id: string
+      title: string
+      view_count: number
+      like_count: number
+      comment_count: number
+      webpage_url: string
+      upload_date: string
+  }[]
 }
 
 // const regions = ["All regions", "Americas", "EMEA", "APAC"] as const
