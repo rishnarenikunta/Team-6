@@ -314,7 +314,7 @@ for country in countries:
 for creator in creators:
     compute_top_claim(
         scope_type="creator",
-        scope_filter={"channel_id": creator},
+        scope_filter={"source": creator},
         creator_id=creator,
         country=None
     )
