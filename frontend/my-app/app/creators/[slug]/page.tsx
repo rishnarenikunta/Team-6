@@ -1,80 +1,89 @@
+"use client"
 import Link from "next/link"
-import { notFound } from "next/navigation"
-
-type ContentCreator = {
-  slug: string
-  name: string
-  region: "Americas" | "EMEA" | "APAC"
-  domain: string
-  subscribers: number
-  monthlyViews: number
-  contentType: "Travel" | "Food" | "Lifestyle/Vlog" | "Wellness" | "Tech" | "Entertainment" | "News"
-  videos: { title: string; views: string; img: string; link: string }[]
-  profilePhoto?: string
-  commentVolume30d: number
-  sentiment: { positive: number; neutral: number; negative: number }
-  topThemes: string[]
-  highlightedComments: string[]
-  risk: RiskStats[]
-}
+import { useEffect, useState } from "react"
+import { useParams } from "next/navigation"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
-type RiskStats = {
-  riskTitle: string
-  riskDescription: string
-}
-
-type ApiContentCreator = {
+type ApiContentCreatorResponse = {
   channel_id: string
-  name: string
+  creator_name: string
   subscriber_count: number
   views: number
-  join_date?: string
-  top_claim?: string | null
-  cluster_size?: number | null
-  computed_at?: string | null
-  claims?: {
-    destination: string
+  comment_volume: number
+  videos: {
+    video_id: string
+    title: string
+    view_count: number
+    like_count: number
+    comment_count: number
+    webpage_url: string
+    upload_date: string
+  }[]
+  trending_narratives: {
+    narrative_id: string
+    narrative: string
+    cluster_size: number
+    video_id: string
+    computed_at: string
+    total_docs: number
+  }[]
+  trending_claims: {
+    claim_id: string
     claim_text: string
-    claim_risk: string
-    date: string
+    cluster_size: number
+    computed_at: string
+    total_docs: number
   }[]
 }
-
-const creators: ContentCreator[] = []
 
 const formatNumber = (value: number) =>
   value.toLocaleString("en-US", { notation: "compact", maximumFractionDigits: 1 })
 
-type Params = { params: Promise<{ slug: string }> }
+export default function CreatorDetailPage() {
+  const params = useParams<{ slug: string }>()
+  const slug = params?.slug
 
-export default async function CreatorDetailPage({ params }: Params) {
-  const { slug } = await params
+  const [creator, setCreator] = useState<ApiContentCreatorResponse | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
-  let creator: ContentCreator | undefined
-
-  try {
-    const res = await fetch(`${API_BASE}/api/creators/${slug}`, { cache: "no-store" })
-    if (res.ok) {
-      const apiCreator: ApiContentCreator = await res.json()
-      creator = mapApiCreatorToContentCreator(apiCreator)
-      console.log("Fetched creator from API:", creator)
+  useEffect(() => {
+    let cancelled = false
+    if (!slug) return
+    async function fetchCreator() {
+      try {
+        const res = await fetch(`${API_BASE}/api/creators/${slug}`, { cache: "no-store" })
+        if (!res.ok) throw new Error(`API error ${res.status}`)
+        const data: ApiContentCreatorResponse = await res.json()
+        if (!cancelled) setCreator(data)
+      } catch (err: any) {
+        if (!cancelled) setError(err.message ?? "Failed to fetch creator")
+        console.error(`Failed to fetch creator ${slug}:`, err)
+      }
     }
-  } catch (err) {
-    console.error(`Failed to fetch creator ${slug}:`, err)
+    fetchCreator()
+    return () => {
+      cancelled = true
+    }
+  }, [slug])
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-[#0b0b10] via-[#0f1018] to-[#0b0b10] text-white flex items-center justify-center">
+        <p className="text-sm text-gray-300">Error loading creator: {error}</p>
+      </div>
+    )
   }
 
-  // Fallback to static seed data if API is missing
   if (!creator) {
-    creator = creators.find((c) => c.slug === slug)
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-[#0b0b10] via-[#0f1018] to-[#0b0b10] text-white flex items-center justify-center">
+        <p className="text-sm text-gray-300">Loading creator…</p>
+      </div>
+    )
   }
 
-  if (!creator) {
-    notFound()
-  }
-
-  const avatar = creator.profilePhoto ?? creator.videos[0]?.img ?? ""
+  const avatar = "/images/placeholder.jpg"
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#0b0b10] via-[#0f1018] to-[#0b0b10] text-white">
@@ -84,36 +93,36 @@ export default async function CreatorDetailPage({ params }: Params) {
             Creators
           </Link>
           <span className="text-gray-600">/</span>
-          <span className="text-gray-200">{creator.name}</span>
+          <span className="text-gray-200">{creator.creator_name}</span>
         </div>
 
         <header className="space-y-4">
           <div className="flex items-start gap-4">
             <div className="h-16 w-16 rounded-full border border-white/10 bg-gradient-to-br from-purple-500/30 to-indigo-500/30 overflow-hidden flex items-center justify-center">
-              {avatar ? <img src={avatar} alt={creator.name} className="h-full w-full object-cover" /> : <span className="text-xs text-gray-100">YT</span>}
+              {avatar ? <img src={avatar} alt={creator.creator_name} className="h-full w-full object-cover" /> : <span className="text-xs text-gray-100">YT</span>}
             </div>
             <div className="space-y-3">
               <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-wide text-gray-200">
-                <span className="rounded-full bg-emerald-500/15 text-emerald-200 px-3 py-1">{creator.region}</span>
-                <span className="rounded-full bg-white/10 px-3 py-1">{creator.contentType}</span>
-                <span className="rounded-full bg-white/10 px-3 py-1">{formatNumber(creator.subscribers)} subs</span>
-                <span className="rounded-full bg-white/10 px-3 py-1">{formatNumber(creator.monthlyViews)} monthly views</span>
-                <span className="rounded-full bg-white/10 px-3 py-1">{creator.videos.length} featured videos</span>
+                <span className="rounded-full bg-emerald-500/15 text-emerald-200 px-3 py-1">{formatNumber(creator.subscriber_count)} subs</span>
+                <span className="rounded-full bg-white/10 px-3 py-1">{formatNumber(creator.views)} views</span>
+                <span className="rounded-full bg-white/10 px-3 py-1">{creator.videos.length} videos</span>
+                <span className="rounded-full bg-white/10 px-3 py-1">{creator.trending_claims.length} claims</span>
+                <span className="rounded-full bg-white/10 px-3 py-1">{creator.trending_narratives.length} narratives</span>
               </div>
-              <h1 className="text-4xl font-semibold leading-tight">{creator.name}</h1>
-              <p className="text-base text-gray-300 max-w-3xl">{creator.domain}</p>
+              <h1 className="text-4xl font-semibold leading-tight">{creator.creator_name}</h1>
+              <p className="text-base text-gray-300 max-w-3xl">{creator.videos.length} recent videos</p>
             </div>
           </div>
         </header>
 
         <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <MetricCard label="Subscribers" value={formatNumber(creator.subscribers)} />
-          <MetricCard label="Monthly views" value={formatNumber(creator.monthlyViews)} />
-          <MetricCard label="Region" value={creator.region} />
-          <MetricCard label="Content type" value={creator.contentType} />
+          <MetricCard label="Subscribers" value={formatNumber(creator.subscriber_count)} />
+          <MetricCard label="Views" value={formatNumber(creator.views)} />
+          <MetricCard label="Comments (30d)" value={formatNumber(creator.comment_volume)} />
+          <MetricCard label="Videos" value={`${creator.videos.length}`} />
         </section>
 
-        <section className="space-y-3">
+        {/* <section className="space-y-3">
           <div>
             <p className="text-xs uppercase tracking-[0.25em] text-gray-400">Risk & compliance</p>
             <p className="text-sm text-gray-400">Last 12 months of safety signals.</p>
@@ -123,18 +132,18 @@ export default async function CreatorDetailPage({ params }: Params) {
               <MetricCard key={risk.riskTitle} label={risk.riskTitle} value={risk.riskDescription} />
             ))}
           </div>
-        </section>
+        </section> */}
 
-        <section className="space-y-4">
+        {/* <section className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs uppercase tracking-[0.25em] text-gray-400">Audience comments & sentiment</p>
               <p className="text-sm text-gray-400">Last 30 days of comment velocity and tone.</p>
             </div>
             <span className="text-xs text-gray-300">{formatNumber(creator.commentVolume30d)} comments</span>
-          </div>
+          </div> */}
 
-          <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
+          {/* <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
             <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-inner shadow-black/30 space-y-4">
               <div className="space-y-3">
                 <SentimentRow label="Positive" value={creator.sentiment.positive} color="from-emerald-400/90 to-emerald-500/80" />
@@ -150,9 +159,9 @@ export default async function CreatorDetailPage({ params }: Params) {
                   </div>
                 ))}
               </div>
-            </div>
+            </div> */}
 
-            <div className="rounded-2xl border border-white/10 bg-gradient-to-b from-[#1d1524] via-[#14101a] to-[#0b0b10] p-5 shadow-lg shadow-black/40 space-y-3">
+            {/* <div className="rounded-2xl border border-white/10 bg-gradient-to-b from-[#1d1524] via-[#14101a] to-[#0b0b10] p-5 shadow-lg shadow-black/40 space-y-3">
               <p className="text-[11px] uppercase tracking-wide text-gray-300">Top themes</p>
               <div className="flex flex-wrap gap-2">
                 {creator.topThemes.map((theme) => (
@@ -166,7 +175,7 @@ export default async function CreatorDetailPage({ params }: Params) {
               </p>
             </div>
           </div>
-        </section>
+        </section> */}
 
         {/* RECENT VIDEOS SECTION */}
         <section className="space-y-3">
@@ -175,29 +184,73 @@ export default async function CreatorDetailPage({ params }: Params) {
               <p className="text-xs uppercase tracking-[0.25em] text-gray-400">Recent videos</p>
               <p className="text-sm text-gray-400">Sample of the creator’s recent uploads.</p>
             </div>
-            <span className="text-xs text-gray-400">{creator.videos.length} videos</span>
+            <span className="text-xs text-gray-400">{creator?.videos.length ?? 0} videos</span>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {creator.videos.map((video) => (
+            {creator?.videos?.map((video) => (
               <Link
-                key={video.title}
-                href={video.link}
+                key={video.video_id}
+                href={video.webpage_url}
                 className="group rounded-2xl border border-white/10 bg-gradient-to-b from-[#151525] via-[#11111a] to-[#0c0c12] shadow-lg shadow-black/40 overflow-hidden transition hover:-translate-y-1 hover:border-white/20"
               >
                 <div className="h-40 w-full bg-gray-800 overflow-hidden">
-                  <img
-                    src={video.img}
-                    alt={video.title}
-                    className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                  />
+                  <div className="h-full w-full bg-[#1f1f2b] flex items-center justify-center text-xs text-gray-400">
+                    {video.upload_date || "Recent video"}
+                  </div>
                 </div>
                 <div className="p-4 space-y-2">
                   <p className="text-sm font-semibold text-white line-clamp-2">{video.title}</p>
-                  <p className="text-xs text-gray-300">{video.views}</p>
-                  <p className="text-[11px] text-gray-400">Tap to view source</p>
+                  <p className="text-xs text-gray-300">
+                    {formatNumber(video.view_count)} views · {formatNumber(video.comment_count)} comments · {formatNumber(video.like_count)} likes
+                  </p>
+                  <p className="text-[11px] text-gray-400">Uploaded: {video.upload_date || "—"}</p>
                 </div>
               </Link>
+            ))}
+          </div>
+        </section>
+
+        {/* TRENDING NARRATIVES */}
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.25em] text-gray-400">Trending narratives</p>
+              <p className="text-sm text-gray-400">Top narratives linked to this creator.</p>
+            </div>
+            <span className="text-xs text-gray-400">{creator?.trending_narratives?.length ?? 0} items</span>
+          </div>
+          <div className="space-y-2">
+            {creator?.trending_narratives?.map((narr) => (
+              <div key={narr.narrative_id} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-gray-200">
+                <div className="flex justify-between items-center">
+                  <Link href={`/narratives/${narr.narrative_id}`} className="font-semibold hover:text-white">
+                    {narr.narrative}
+                  </Link>
+                  <span className="text-[11px] text-gray-400">Cluster {narr.cluster_size}</span>
+                </div>
+                <p className="text-[11px] text-gray-400">Computed: {narr.computed_at || "—"} · Docs: {narr.total_docs ?? 0}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* TRENDING CLAIMS */}
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.25em] text-gray-400">Trending claims</p>
+              <p className="text-sm text-gray-400">High-signal claims tied to this creator.</p>
+            </div>
+            <span className="text-xs text-gray-400">{creator?.trending_claims?.length ?? 0} items</span>
+          </div>
+          <div className="space-y-2">
+            {creator?.trending_claims?.map((claim) => (
+              <div key={claim.claim_id} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-gray-200">
+                <p className="font-semibold text-white line-clamp-2">{claim.claim_text}</p>
+                <p className="text-[11px] text-gray-400">Cluster {claim.cluster_size} · Docs {claim.total_docs ?? 0}</p>
+                <p className="text-[11px] text-gray-500">Computed: {claim.computed_at || "—"}</p>
+              </div>
             ))}
           </div>
         </section>
