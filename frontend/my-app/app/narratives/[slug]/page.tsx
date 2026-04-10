@@ -48,7 +48,6 @@ type Creator = {
   slug: string
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 
 const sentimentChip = (sentiment: NarrativeDetail["sentiment"]) => {
@@ -64,7 +63,7 @@ export default async function NarrativeDetailPage({ params }: Params) {
   
   const { slug } = await params;
   
-  const res = await fetch(`${API_BASE}/api/narratives/${slug}`)
+  const res = await fetch(`/api/narratives/${slug}`)
   if (!res.ok) {
     console.error(`Failed to fetch narrative ${slug}:`, res.statusText);
     notFound();

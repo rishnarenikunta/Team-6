@@ -16,8 +16,6 @@ type Narrative = {
   tags: string[]
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-
 const narratives: Narrative[] = [
   {
     slug: "slow-travel-japan-countryside",
@@ -69,7 +67,7 @@ useEffect(() => {
   async function fetchNarratives() {
     try {
       setError(null);
-      const res = await fetch(`${API_BASE}/api/narratives`);
+      const res = await fetch(`/api/narratives`);
       if (!res.ok) throw new Error(`API error ${res.status}`);
       const data: ApiNarrativesResponse = await res.json();
 
