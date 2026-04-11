@@ -53,6 +53,6 @@ jobs:
         echo "Found newest image: $IMAGE_URL"
         
         # 3. Update the dispatcher job
-        gcloud run jobs update youtravel-batch-dispatcher \
+        gcloud run jobs update batch-youtravel-llm-job \
           --image "$IMAGE_URL" \
           --region us-central1
