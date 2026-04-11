@@ -75,24 +75,42 @@ useEffect(() => {
   async function fetchNarratives() {
     try {
       setError(null);
-      const res = await fetch(`/api/narratives/enriched`);
-      if (!res.ok) throw new Error(`API error ${res.status}`);
-      const data: ApiNarrativesResponse = await res.json();
+
+      const [narrativesRes, creatorsRes] = await Promise.all([
+        fetch(`/api/narratives/enriched`),
+        fetch(`/api/creators`),
+      ]);
+
+      if (!narrativesRes.ok) throw new Error(`API error ${narrativesRes.status}`);
+      if (!creatorsRes.ok) throw new Error(`API error ${creatorsRes.status}`);
+
+      const data: ApiNarrativesResponse = await narrativesRes.json();
+      const creatorsData: { channel_id: string; creator_name: string }[] = await creatorsRes.json();
+
+      // Build a channel_id → creator_name map
+      const creatorMap: Record<string, string> = {};
+      for (const c of creatorsData) {
+        creatorMap[c.channel_id] = c.creator_name;
+      }
+
       console.log("Fetched narratives:", data);
+
       const mapped: Narrative[] = data.map((item) => ({
         slug: item.slug || item.narrative_id,
-        title: item.narrative_text,                 // or item.destination, or truncate(item.text)
+        title: item.narrative_text,
         sentiment: item.metadata.sentiment || "neutral",
         sentiment_score: item.metadata.sentiment_score || 0,
-        creators: item.channel_id || "Unknown creator",
+        creators: creatorMap[item.channel_id] || item.channel_id || "Unknown creator",
         date: item.date
           ? new Date(item.date).toLocaleString()
           : item.metadata.upload_date
             ? new Date(item.metadata.upload_date).toLocaleDateString()
             : "Unknown date",
-        claim: item.claims.length > 0 ? (item.claims[0].claim_text || item.claims[0].text || "No claim text") : "No claims identified",
+        claim: item.claims.length > 0
+          ? (item.claims[0].claim_text || "No claim text")
+          : "No claims identified",
         risk: "—",
-        tags: item.metadata.tags || [],                         // populate when API includes tags
+        tags: item.metadata.tags || [],
         destination: item.destination || "Unknown destination",
       }));
 
