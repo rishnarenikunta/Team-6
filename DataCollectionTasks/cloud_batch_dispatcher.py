@@ -42,12 +42,16 @@ def run_dispatcher(override_all: bool, finish_narratives: bool):
         print("[INFO] Checking narratives collection to filter completed videos...")
         # Fetch a set of all video_ids that already have narratives for fast lookup
         existing_narrative_video_ids = set(narratives_col.distinct("video_id"))
+        print(f"[INFO] Found {len(existing_narrative_video_ids)} videos with existing narratives. Filtering out from dispatch list...")
+        print(existing_narrative_video_ids)
         
         # Keep only the docs where the video _id is NOT in the existing_narratives set
         docs = [doc for doc in docs if doc.get("_id") not in existing_narrative_video_ids]
         mode_text += " + FINISH NARRATIVES"
 
     total_docs = len(docs)
+    print(len(docs))
+    return
     
     if total_docs == 0:
         print(f"[INFO] Mode: {mode_text}. No documents to process. Exiting.")
