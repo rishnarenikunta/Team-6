@@ -593,5 +593,8 @@ if __name__ == "__main__":
             print(f"[SUCCESS] Saved to MongoDB. Inserted {len(n_ids)} narratives and {len(c_ids)} claims.")
         except Exception as e:
             print(f"[ERROR] Failed to save features to MongoDB: {e}")
+        finally:
+            db_client.close()
+            print("[INFO] MongoDB connection closed.")
     else:
         print("[WARN] MongoDB connection not established. Skipping database insertion.")

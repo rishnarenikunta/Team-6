@@ -20,32 +20,32 @@ def safe_dispatch(run_client, job_request):
 def run_dispatcher(override_all: bool, finish_narratives: bool):
     load_dotenv()
     
-    # 1. Connect to MongoDB
+    # 1. Connect to MongoDB using a context manager
     mongo_uri = os.getenv("MONGODB_URI")
     if not mongo_uri:
         print("[ERROR] MONGODB_URI missing.")
         return
 
-    client = MongoClient(mongo_uri)
-    db = client["travel_app"]
-    videos = db["metadata"]
-    narratives_col = db["narratives"]
+    with MongoClient(mongo_uri) as client:
+        db = client["travel_app"]
+        videos = db["metadata"]
+        narratives_col = db["narratives"]
 
-    # 2. Build Query
-    query = {} if override_all else {"is_travel": {"$exists": False}}
-    mode_text = "OVERRIDE ALL" if override_all else "MISSING ONLY"
-    
-    docs = list(videos.find(query))
-
-    # 2.5 Filter for narratives if flag is set
-    if finish_narratives:
-        print("[INFO] Checking narratives collection to filter completed videos...")
-        # Fetch a set of all video_ids that already have narratives for fast lookup
-        existing_narrative_video_ids = set(narratives_col.distinct("video_id"))
+        # 2. Build Query
+        query = {} if override_all else {"is_travel": {"$exists": False}}
+        mode_text = "OVERRIDE ALL" if override_all else "MISSING ONLY"
         
-        # Keep only the docs where the video _id is NOT in the existing_narratives set
-        docs = [doc for doc in docs if doc.get("_id") not in existing_narrative_video_ids]
-        mode_text += " + FINISH NARRATIVES"
+        docs = list(videos.find(query))
+
+        # 2.5 Filter for narratives if flag is set
+        if finish_narratives:
+            print("[INFO] Checking narratives collection to filter completed videos...")
+            # Fetch a set of all video_ids that already have narratives for fast lookup
+            existing_narrative_video_ids = set(narratives_col.distinct("video_id"))
+            
+            # Keep only the docs where the video _id is NOT in the existing_narratives set
+            docs = [doc for doc in docs if doc.get("_id") not in existing_narrative_video_ids]
+            mode_text += " + FINISH NARRATIVES"
 
     total_docs = len(docs)
     
