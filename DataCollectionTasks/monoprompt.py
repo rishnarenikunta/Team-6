@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 
 from google.cloud import storage
 from pymongo import MongoClient
+import random
 
 load_dotenv()
 
@@ -45,7 +46,7 @@ class GeminiRotator:
         """Executes a function and retries on rate limits or server errors."""
         if max_attempts is None:
             # By default, allow enough attempts to cycle through all keys twice
-            max_attempts = len(self.keys) * 2
+            max_attempts = len(self.keys) * 3 # Give it a few more tries
 
         attempts = 0
         while attempts < max_attempts:
@@ -54,20 +55,23 @@ class GeminiRotator:
             except errors.APIError as e:
                 # Check for 429 (Rate Limit) or 5xx (Server Errors)
                 if e.code == 429 or e.code >= 500:
-                    print(f"[WARN] API Error {e.code}: {e.message}. Rotating key...")
                     self._rotate()
                     attempts += 1
-                    time.sleep(1)  # Brief backoff before retrying
+                    # Exponential backoff with jitter: 2^attempts + random milliseconds
+                    sleep_time = (2 ** attempts) + random.uniform(0, 1)
+                    print(f"[WARN] API Error {e.code}: {e.message}. Sleeping for {sleep_time:.2f}s...")
+                    time.sleep(sleep_time)
                 else:
-                    raise e  # Re-raise for 400 Bad Request, etc.
+                    raise e
             except Exception as e:
                 # Fallback for unexpected network exceptions containing the status code
                 error_str = str(e)
                 if "429" in error_str or "500" in error_str or "503" in error_str:
-                    print(f"[WARN] Caught exception with 429/5xx signature: {error_str}. Rotating key...")
                     self._rotate()
                     attempts += 1
-                    time.sleep(1)
+                    sleep_time = (2 ** attempts) + random.uniform(0, 1)
+                    print(f"[WARN] Caught rate limit exception. Sleeping for {sleep_time:.2f}s...")
+                    time.sleep(sleep_time)
                 else:
                     raise e
                     
