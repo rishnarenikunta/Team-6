@@ -71,8 +71,7 @@ def run_dispatcher(override_all: bool):
             # Asynchronous trigger - fires and forgets
             safe_dispatch(run_client, job_request)
             
-            # You can keep a very small sleep here just to be nice to the CPU
-            time.sleep(0.1)
+            time.sleep(2.5) # so it's under the 15 RPM of gemini 3.1 flash lite with 2 keys
 
         except Exception as e:
             print(f"[ERROR] Failed to dispatch job for {video_id}: {e}")
