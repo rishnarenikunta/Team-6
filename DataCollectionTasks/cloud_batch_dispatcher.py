@@ -17,7 +17,7 @@ from google.api_core.exceptions import ResourceExhausted # This is the specific 
 def safe_dispatch(run_client, job_request):
     run_client.run_job(request=job_request)
 
-def run_dispatcher(override_all: bool):
+def run_dispatcher(override_all: bool, finish_narratives: bool):
     load_dotenv()
     
     # 1. Connect to MongoDB
@@ -29,12 +29,24 @@ def run_dispatcher(override_all: bool):
     client = MongoClient(mongo_uri)
     db = client["travel_app"]
     videos = db["metadata"]
+    narratives_col = db["narratives"]
 
     # 2. Build Query
     query = {} if override_all else {"is_travel": {"$exists": False}}
     mode_text = "OVERRIDE ALL" if override_all else "MISSING ONLY"
     
     docs = list(videos.find(query))
+
+    # 2.5 Filter for narratives if flag is set
+    if finish_narratives:
+        print("[INFO] Checking narratives collection to filter completed videos...")
+        # Fetch a set of all video_ids that already have narratives for fast lookup
+        existing_narrative_video_ids = set(narratives_col.distinct("video_id"))
+        
+        # Keep only the docs where the video _id is NOT in the existing_narratives set
+        docs = [doc for doc in docs if doc.get("_id") not in existing_narrative_video_ids]
+        mode_text += " + FINISH NARRATIVES"
+
     total_docs = len(docs)
     
     if total_docs == 0:
@@ -81,7 +93,7 @@ def run_dispatcher(override_all: bool):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--all", action="store_true", help="Process all documents and override.")
-    parser.add_argument("--collection", type=str, default="metadata", help="MongoDB collection to read from.")
+    parser.add_argument("--finish-narratives", action="store_true", help="Only dispatch jobs for videos without an entry in the narratives collection.")
     args = parser.parse_args()
-    
-    run_dispatcher(override_all=args.all)
+
+    run_dispatcher(override_all=args.all, finish_narratives=args.finish_narratives)
