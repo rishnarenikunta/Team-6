@@ -4,3 +4,7 @@ venv
 __pycache__/
 *.pyc
 cookies.txt
+
+*.log
+*.json
+application_default_credentials.json
