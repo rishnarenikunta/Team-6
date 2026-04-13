@@ -329,9 +329,6 @@ from math import floor
 
 
 # ── /api/stats/main ──────────────────────────────────────────────────────────
-# Powers StatsMain.tsx
-# Returns: topDestination, active narratives count, total claims, trending
-#          creator count, and creator tier breakdown.
 
 @app.get("/api/stats/main")
 def get_main_stats() -> dict[str, Any]:
@@ -451,10 +448,6 @@ def list_narratives(
     return {"total": total, "offset": offset, "limit": limit, "items": items}
 
 # ── /api/narratives/enriched ─────────────────────────────────────────────────
-# Returns all narratives enriched with:
-#   - claims joined on narrative_id
-#   - metadata tags + sentiment label
-#   - slug field (= narrative_id)
 
 @app.get("/api/narratives/enriched")
 def get_narratives_enriched() -> list[dict[str, Any]]:
@@ -716,7 +709,6 @@ def get_narrative_enriched_videoDetails(narrative_id: str) -> dict[str, Any]:
 
 
 # ── /api/narratives/{slug} ───────────────────────────────────────────────────
-# Powers /narratives/[slug]/page.tsx — single narrative detail
 
 @app.get("/api/narratives/{slug}")
 def get_narrative_detail(slug: str) -> dict[str, Any]:
