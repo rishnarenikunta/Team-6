@@ -1262,7 +1262,12 @@ app = FastAPI(title="YouTube Transcription API", version="1.0.0")
 PY = sys.executable
 
 BUCKET_NAME = os.getenv("GCS_BUCKET_NAME", "youtravel_transcripts")
-storage_client = storage.Client()
+# storage_client = storage.Client()
+try:
+    storage_client = storage.Client()
+except Exception as e:
+    print(f"[GCS DISABLED] {e}")
+    storage_client = None
 
 MONGODB_URI = os.getenv("MONGODB_URI")
 MONGODB_DB = os.getenv("MONGODB_DB", "travel_app")
@@ -1797,7 +1802,7 @@ def home():
         "openai_key_set": bool(os.getenv("OPENAI_API_KEY")),
         "cookies_path_set": bool(os.getenv("YT_COOKIES_PATH")),
         "cookies_exists": bool(os.getenv("YT_COOKIES_PATH") and os.path.exists(os.getenv("YT_COOKIES_PATH"))),
-        "gcp_project": storage_client.project,
+        "gcp_project": storage_client.project if storage_client else None,
         "py": PY,
         "ffmpeg": FFMPEG,
         "mongo_connected": bool(mongo_client),

@@ -5,3 +5,6 @@ yt-dlp
 pymongo[srv]
 python-dotenv
 google-cloud-storage
+openai
+fastapi
+uvicorn
