@@ -1254,6 +1254,7 @@ from dotenv import load_dotenv
 from pymongo import MongoClient, UpdateOne
 from google.cloud import storage
 from openai import OpenAI
+from datetime import datetime, timezone
 
 load_dotenv(dotenv_path=Path(__file__).with_name(".env"))
 
@@ -1788,6 +1789,24 @@ def fetch_video_info(video_id: str) -> dict:
         "channel_url": info.get("channel_url"),
     }
 
+def recency_boost(upload_date: Optional[str], half_life_days: int = 180) -> float:
+    """
+    Returns a value between about 0 and 1.
+    Newer videos are closer to 1.
+    Older videos decay gradually.
+    """
+    if not upload_date:
+        return 0.0
+
+    try:
+        published = datetime.strptime(upload_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        now = datetime.now(timezone.utc)
+        age_days = max((now - published).days, 0)
+
+        # exponential decay
+        return 0.5 ** (age_days / half_life_days)
+    except Exception:
+        return 0.0
 
 # ---------------------------------------------------------------------------
 # Endpoints
@@ -1880,6 +1899,7 @@ def top_20_videos_by_bucket_store(
     w_views: float = DEFAULT_WEIGHTS["views"],
     w_likes: float = DEFAULT_WEIGHTS["likes"],
     w_comments: float = DEFAULT_WEIGHTS["comments"],
+    w_recency: float = 0.15,
 ):
     if (w_views + w_likes + w_comments) <= 0:
         raise HTTPException(status_code=400, detail="Weights must sum to > 0")
