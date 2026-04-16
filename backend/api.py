@@ -141,7 +141,7 @@ def get_destinations(region: Optional[str]= None, tag: Optional[str]= None) -> l
             results.append({
                 "id":          str(raw["_id"]),
                 "name":        dest,
-                "blurb":       raw.get("narrative_text", ""),
+                "blurb":       raw.get("narrative_title", ""),
                 "top_narrative": None,
                 "cluster_size": None,
                 "computed_at": None,
@@ -460,7 +460,7 @@ def list_narratives(
         {
             "id":           str(doc["_id"]),
             "narrative_id": doc.get("narrative_id", ""),
-            "text":         doc.get("narrative_text", ""),
+            "text":         doc.get("narrative_title", ""),
             "destination":  doc.get("destination", ""),
             "date":         doc["date"].isoformat() if doc.get("date") else None,
             "channel_id":   doc.get("channel_id", ""),
@@ -489,14 +489,14 @@ def get_narratives_enriched() -> list[dict[str, Any]]:
     all_claims = list(
         db["claims"].find(
             {},
-            {"_id": 0, "narrative_id": 1, "claim_text": 1, "claim_risk": 1, "source": 1, "date": 1},
+            {"_id": 0, "narrative_id": 1, "claim_title": 1, "claim_risk": 1, "source": 1, "date": 1},
         )
     )
     claims_by_narrative: dict[str, list] = {}
     for claim in all_claims:
         nid = claim.get("narrative_id", "")
         claims_by_narrative.setdefault(nid, []).append({
-            "claim_text": claim.get("claim_text", ""),
+            "claim_text": claim.get("claim_title", ""),
             "claim_risk": claim.get("claim_risk", ""),
             "source":     claim.get("source", ""),
             "date":       claim.get("date", ""),
@@ -534,7 +534,7 @@ def get_narratives_enriched() -> list[dict[str, Any]]:
             "video_id":       video_id,
             "destination":    doc.get("destination", ""),
             "channel_id":     doc.get("channel_id", ""),
-            "narrative_text": doc.get("narrative_text", ""),
+            "narrative_text": doc.get("narrative_title", ""),
             "date":           doc["date"].isoformat() if doc.get("date") else None,
             "claims":         claims_by_narrative.get(narrative_id, []),
             "metadata": {
@@ -563,7 +563,7 @@ def get_narratives_enriched_videoDetails() -> list[dict[str, Any]]:
     all_claims = list(
         db["claims"].find(
             {},
-            {"_id": 0, "narrative_id": 1, "claim_text": 1, "claim_risk": 1, "source": 1, "date": 1},
+            {"_id": 0, "narrative_id": 1, "claim_title": 1, "claim_risk": 1, "source": 1, "date": 1},
         )
     )
    
@@ -571,7 +571,7 @@ def get_narratives_enriched_videoDetails() -> list[dict[str, Any]]:
     for claim in all_claims:
         nid = claim.get("narrative_id", "")
         claims_by_narrative.setdefault(nid, []).append({
-            "claim_text": claim.get("claim_text", ""),
+            "claim_text": claim.get("claim_title", ""),
             "claim_risk": claim.get("claim_risk", ""),
             "source":     claim.get("source", ""),
             "date":       claim.get("date", ""),
@@ -643,7 +643,7 @@ def get_narratives_enriched_videoDetails() -> list[dict[str, Any]]:
             "video_id":       video_id,
             "destination":    doc.get("destination", ""),
             "channel_id":     doc.get("channel_id", ""),
-            "narrative_text": doc.get("narrative_text", ""),
+            "narrative_text": doc.get("narrative_title", ""),
             "creator_pfp":   creator.get("pfp_url", ""),
             "date":           doc["date"].isoformat() if doc.get("date") else None,
             "claims":         claims_by_narrative.get(narrative_id, []),
@@ -686,14 +686,14 @@ def get_narrative_enriched_videoDetails(narrative_id: str) -> dict[str, Any]:
     # ── 2. Fetch claims joined on narrative_id ────────────────────────────────
     claims = [
         {
-            "claim_text": c.get("claim_text", ""),
+            "claim_text": c.get("claim_title", ""),
             "claim_risk": c.get("claim_risk", ""),
             "source":     c.get("source", ""),
             "date":       c.get("date", ""),
         }
         for c in db["claims"].find(
             {"narrative_id": narrative_id},
-            {"_id": 0, "claim_text": 1, "claim_risk": 1, "source": 1, "date": 1},
+            {"_id": 0, "claim_title": 1, "claim_risk": 1, "source": 1, "date": 1},
         )
     ]
 
@@ -744,7 +744,7 @@ def get_narrative_enriched_videoDetails(narrative_id: str) -> dict[str, Any]:
         "creator_pfp":   creator.get("pfp_url", ""),
         "destination":    doc.get("destination", ""),
         "channel_id":     doc.get("channel_id", ""),
-        "narrative_text": doc.get("narrative_text", ""),
+        "narrative_text": doc.get("narrative_title", ""),
         "date":           doc["date"].isoformat() if doc.get("date") else None,
         "claims":         claims,
         "metadata": {
@@ -795,7 +795,7 @@ def get_narrative_detail(slug: str) -> dict[str, Any]:
     related_claims = list(
         db["claims"].find(
             {"destination": destination},
-            {"_id": 0, "claim_text": 1, "source": 1, "claim_risk": 1, "date": 1},
+            {"_id": 0, "claim_title": 1, "source": 1, "claim_risk": 1, "date": 1},
         ).limit(10)
     )
 
@@ -808,7 +808,7 @@ def get_narrative_detail(slug: str) -> dict[str, Any]:
     siblings = list(
         db["narratives"].find(
             {"destination": destination, "narrative_id": {"$ne": slug}},
-            {"narrative_id": 1, "narrative_text": 1},
+            {"narrative_id": 1, "narrative_title": 1},
         ).limit(5)
     )
 
@@ -816,7 +816,7 @@ def get_narrative_detail(slug: str) -> dict[str, Any]:
         "id":             str(doc["_id"]),
         "narrative_id":   doc.get("narrative_id", ""),
         "slug":           slug,
-        "text":           doc.get("narrative_text", ""),
+        "text":           doc.get("narrative_title", ""),
         "destination":    destination,
         "date":           doc["date"].isoformat() if doc.get("date") else None,
         "channel_id":     channel_id,
@@ -827,7 +827,7 @@ def get_narrative_detail(slug: str) -> dict[str, Any]:
         "top_narrative":  cluster.get("narrative") if cluster else None,
         "related_claims": related_claims,
         "related_narratives": [
-            {"slug": s["narrative_id"], "text": s["narrative_text"]}
+            {"slug": s["narrative_id"], "text": s["narrative_title"]}
             for s in siblings
         ],
         # ── video fields from metadata collection ─────────────────────────────
@@ -951,7 +951,7 @@ def get_destination(destination_name: str) -> dict[str, Any]:
         if not raw:
             raise HTTPException(status_code=404, detail="Destination not found")
         dest_name = raw["destination"]
-        blurb = raw.get("narrative_text", "")
+        blurb = raw.get("narrative_title", "")
         cluster_size = None
         computed_at = None
         doc_id = str(raw["_id"])
@@ -966,7 +966,7 @@ def get_destination(destination_name: str) -> dict[str, Any]:
     claims = list(
         db["claims"].find(
             {"destination": dest_name},
-            {"_id": 0, "claim_text": 1, "source": 1, "claim_risk": 1, "date": 1}
+            {"_id": 0, "claim_title": 1, "source": 1, "claim_risk": 1, "date": 1}
         )
     )
 
