@@ -176,7 +176,6 @@ export default function CreatorsPage() {
               <div className="mt-4 grid grid-cols-2 gap-3 text-xs text-gray-300">
                 <Stat label="Subscribers" value={formatNumber(creator.subscriber_count)} />
                 <Stat label="Views" value={formatNumber(creator.views)} />
-                <Stat label="Comment Volume" value={formatNumber(creator.comment_volume)} />
                 {/* <Stat label="Typical CPM" value="$18–$26" /> */}
               </div>
 

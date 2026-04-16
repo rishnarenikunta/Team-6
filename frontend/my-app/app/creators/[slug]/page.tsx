@@ -9,7 +9,6 @@ type ApiContentCreatorResponse = {
   creator_name: string
   subscriber_count: number
   views: number
-  comment_volume: number
   videos: {
     video_id: string
     title: string
@@ -117,7 +116,6 @@ export default function CreatorDetailPage() {
         <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <MetricCard label="Subscribers" value={formatNumber(creator.subscriber_count)} />
           <MetricCard label="Views" value={formatNumber(creator.views)} />
-          <MetricCard label="Comments (30d)" value={formatNumber(creator.comment_volume)} />
           <MetricCard label="Videos" value={`${creator.videos.length}`} />
         </section>
 
