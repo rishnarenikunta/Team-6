@@ -408,6 +408,25 @@ def get_main_stats() -> dict[str, Any]:
         "creator_insights":     creator_insights,
     }
 
+# ── /api/creators/{channel_id}/pfp ───────────────────────────────────────────
+# Returns the stored profile picture URL for a creator
+
+@app.get("/api/creators/{channel_id}/pfp")
+def get_creator_pfp(channel_id: str) -> dict[str, Any]:
+    creator = db["creators"].find_one(
+        {"channel_id": channel_id},
+        {"_id": 0, "channel_id": 1, "name": 1, "pfp_url": 1},
+    )
+    if not creator:
+        raise HTTPException(status_code=404, detail="Creator not found")
+    if not creator.get("pfp_url"):
+        raise HTTPException(status_code=404, detail="No profile picture found for this creator. Run the enrichment script first.")
+
+    return {
+        "channel_id": creator["channel_id"],
+        "creator_name": creator.get("name", ""),
+        "pfp_url": creator["pfp_url"],
+    }
 
 # ── /api/narratives ──────────────────────────────────────────────────────────
 # Powers /narratives/page.tsx  — paginated list of all narratives
@@ -547,6 +566,7 @@ def get_narratives_enriched_videoDetails() -> list[dict[str, Any]]:
             {"_id": 0, "narrative_id": 1, "claim_text": 1, "claim_risk": 1, "source": 1, "date": 1},
         )
     )
+   
     claims_by_narrative: dict[str, list] = {}
     for claim in all_claims:
         nid = claim.get("narrative_id", "")
@@ -571,10 +591,26 @@ def get_narratives_enriched_videoDetails() -> list[dict[str, Any]]:
                 "webpage_url": 1,
                 "risk_callouts": 1,
                 "stats": 1,
+                "thumbnail_url": 1, 
             },
         )
     )
     meta_by_video: dict[str, dict] = {m["video_id"]: m for m in all_meta if m.get("video_id")}
+
+    all_creators = list(
+    db["creators"].find(
+        {},
+        {
+            "_id": 0,
+            "channel_id": 1,
+            "pfp_url": 1,
+        },
+    )
+    )
+
+    creators_by_channel: dict[str, dict] = {
+        c["channel_id"]: c for c in all_creators if c.get("channel_id")
+    }
 
     # ── 4. Shared helper: sentiment label ─────────────────────────────────────
     def sentiment_label(score) -> str | None:
@@ -593,6 +629,8 @@ def get_narratives_enriched_videoDetails() -> list[dict[str, Any]]:
     # ── 6. Assemble enriched records ──────────────────────────────────────────
     results = []
     for doc in narratives:
+         #find creator assicated with each narrative for joining in the frontend
+        creator = creators_by_channel.get(doc.get("channel_id", ""), {})
         narrative_id  = doc.get("narrative_id", "")
         video_id      = doc.get("video_id", "")
         meta          = meta_by_video.get(video_id, {})
@@ -606,6 +644,7 @@ def get_narratives_enriched_videoDetails() -> list[dict[str, Any]]:
             "destination":    doc.get("destination", ""),
             "channel_id":     doc.get("channel_id", ""),
             "narrative_text": doc.get("narrative_text", ""),
+            "creator_pfp":   creator.get("pfp_url", ""),
             "date":           doc["date"].isoformat() if doc.get("date") else None,
             "claims":         claims_by_narrative.get(narrative_id, []),
             "metadata": {
@@ -614,6 +653,7 @@ def get_narratives_enriched_videoDetails() -> list[dict[str, Any]]:
                 "sentiment":       sentiment_label(raw_sentiment),
                 "title":           meta.get("title", ""),
                 "upload_date":     meta.get("upload_date", ""),
+                "thumbnail_url":   meta.get("thumbnail_url", ""),
                 "webpage_url":     meta.get("webpage_url", ""),
                 "risk_callouts":   parse_risk_callouts(meta.get("risk_callouts", [])),
             },
@@ -669,10 +709,16 @@ def get_narrative_enriched_videoDetails(narrative_id: str) -> dict[str, Any]:
             "webpage_url": 1,
             "risk_callouts": 1,
             "stats": 1,
+            "thumbnail_url": 1,
         },
     ) or {}
 
     stats = meta.get("stats", {})
+
+    creator = db["creators"].find_one(
+    {"channel_id": doc.get("channel_id", "")},
+    {"_id": 0, "pfp_url": 1},
+) or {}
 
     # ── 4. Sentiment label ────────────────────────────────────────────────────
     raw_sentiment = meta.get("sentiment")
@@ -695,6 +741,7 @@ def get_narrative_enriched_videoDetails(narrative_id: str) -> dict[str, Any]:
         "slug":           narrative_id,
         "narrative_id":   narrative_id,
         "video_id":       video_id,
+        "creator_pfp":   creator.get("pfp_url", ""),
         "destination":    doc.get("destination", ""),
         "channel_id":     doc.get("channel_id", ""),
         "narrative_text": doc.get("narrative_text", ""),
@@ -706,6 +753,7 @@ def get_narrative_enriched_videoDetails(narrative_id: str) -> dict[str, Any]:
             "sentiment":       sentiment,
             "title":           meta.get("title", ""),
             "upload_date":     meta.get("upload_date", ""),
+            "thumbnail_url":   meta.get("thumbnail_url", ""),
             "webpage_url":     meta.get("webpage_url", ""),
             "risk_callouts":   risk_callouts,
         },
