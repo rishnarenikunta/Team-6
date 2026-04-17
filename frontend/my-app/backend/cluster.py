@@ -278,8 +278,8 @@ def compute_top_narrative(scope_type, scope_filter, type_id):
                 "video_id":    None,
                 "clusterSize": None,
                 "totalDocs":   0,
-                "averageRiskScore": avg_risk_score,
-                "averageRiskLabel": get_risk_label(avg_risk_score),
+                "averageRiskScore": None,
+                "averageRiskLabel": None,
                 "computedAt":  datetime.now(timezone.utc)
             }},
             upsert=True
