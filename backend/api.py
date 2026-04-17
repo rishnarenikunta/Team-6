@@ -159,7 +159,87 @@ def get_destinations(region: Optional[str]= None, tag: Optional[str]= None) -> l
     return results
 
 
+# ── /api/destinations/{destination_name}/overview ────────────────────────────
+# Destination overview pulling from metadata, claims, narratives, and top_narratives
+# metadata.destinations is an array field — matches if destination_name is in it
 
+@app.get("/api/destinations/{destination_name}/overview")
+def get_destination_overview(destination_name: str) -> dict[str, Any]:
+
+    # ── 1. Count metadata docs where destinations array contains this destination
+    videos_analyzed = db["metadata"].count_documents(
+        {"destinations": {"$elemMatch": {"$regex": destination_name, "$options": "i"}}}
+    )
+
+    if videos_analyzed == 0:
+        raise HTTPException(status_code=404, detail=f"No data found for destination: {destination_name}")
+
+    # ── 2. Grab one metadata doc to resolve the canonical destination name ─────
+    # (so we return "Kyoto" even if the user passed "kyoto")
+    sample_meta = db["metadata"].find_one(
+        {"destinations": {"$elemMatch": {"$regex": destination_name, "$options": "i"}}},
+        {"_id": 0, "destinations": 1},
+    )
+    # Find the exact matching entry in the destinations array
+    canonical_name = destination_name  # fallback
+    if sample_meta:
+        for d in sample_meta.get("destinations", []):
+            if d.lower() == destination_name.lower():
+                canonical_name = d
+                break
+
+    # ── 3. Count claims for this destination ──────────────────────────────────
+    total_claims = db["claims"].count_documents(
+        {"destination": {"$regex": f"^{canonical_name}$", "$options": "i"}}
+    )
+
+    # ── 4. Count narratives for this destination ──────────────────────────────
+    total_narratives = db["narratives"].count_documents(
+        {"destination": {"$regex": f"^{canonical_name}$", "$options": "i"}}
+    )
+
+    # ── 5. Top narrative from top_narratives (narrative-2 cluster) ────────────
+    # typeID holds the destination name for destination-scoped cluster entries
+    top_narrative_doc = db["top_narratives"].find_one(
+        {
+            "typeID":    {"$regex": f"^{canonical_name}$", "$options": "i"},
+            "type":      "country",
+        },
+        {"_id": 0},
+    )
+
+    top_claim_doc = db["top_claims"].find_one(
+        {
+            "typeID":    {"$regex": f"^{canonical_name}$", "$options": "i"},
+            "type":      "country",
+        },
+        {"_id": 0},
+    )
+
+    top_narrative = None
+    if top_narrative_doc:
+        top_narrative = {
+            "narrative":    top_narrative_doc.get("narrative", ""),
+            "cluster_size": top_narrative_doc.get("clusterSize", 0),
+            "computed_at":  top_narrative_doc["computedAt"].isoformat() if top_narrative_doc.get("computedAt") else None,
+            "total_docs":   top_narrative_doc.get("totalDocs", 0),
+        }
+
+    # ── 6. Assemble response ──────────────────────────────────────────────────
+    return {
+        "destination":       canonical_name,
+        "videos_analyzed":   videos_analyzed,
+        "total_claims":      total_claims,
+        "total_narratives":  total_narratives,
+        "top_narrative":     top_narrative,
+        "top_claim":        {
+            "claim_text": top_claim_doc.get("claimText", "") if top_claim_doc else None,
+            "cluster_size": top_claim_doc.get("clusterSize", 0) if top_claim_doc else None,
+            "computed_at": top_claim_doc["computedAt"].isoformat() if top_claim_doc and top_claim_doc.get("computedAt") else None,
+            "total_docs": top_claim_doc.get("totalDocs", 0) if top_claim_doc else None,
+        } if top_claim_doc else None,
+
+    }
 # ── /api/creators  ────────────────────────────────────────────────────────────
 # Returns all creators with their top claim narrative from cluster results
 
