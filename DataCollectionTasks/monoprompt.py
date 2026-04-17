@@ -4,7 +4,7 @@ import os
 import time
 from dotenv import load_dotenv
 
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Literal
 from google import genai  # pip install google-genai
 from google.genai import types, errors
 
@@ -131,9 +131,9 @@ def build_country_features(
 class Claim(BaseModel):
     claim_title: str = Field(description="A short succint display title for the claim")
     claim_text: str
-    fact_check_assessment: str
+    fact_check_assessment: Literal["Verified", "False", "Unverifiable", "Mixed"]
     claim_comment_sentiment: str
-    claim_comment_risk: str
+    claim_comment_risk: Literal["High - Physical Danger", "Medium - Scam/Misinfo", "Low - Subjective", "None"]
 
 class Narrative(BaseModel):
     narrative_title: str = Field(
@@ -141,7 +141,7 @@ class Narrative(BaseModel):
     )
     narrative_description: str
     narrative_comment_summary: str
-    narrative_comment_risk: str
+    narrative_comment_risk: Literal["High - Physical Danger", "Medium - Scam/Misinfo", "Low - Subjective", "None"]
     claims: list[Claim]
 
 class CommentAnalysis(BaseModel):
@@ -243,7 +243,8 @@ def extract_video_features_for_video(
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
                 response_schema=VideoFeatures,
-                temperature=0.2 # Lower temperature for more deterministic, structured outputs
+                temperature=0.2, # Lower temperature for more deterministic, structured outputs
+                tools=[{"google_search": {}}]
             ),
         )
 
