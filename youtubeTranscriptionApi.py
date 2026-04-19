@@ -1962,7 +1962,15 @@ def top_20_videos_by_bucket_store(
                 views = safe_int(info.get("view_count"))
                 likes = safe_int(info.get("like_count"))
                 comments_count = safe_int(info.get("comment_count"))
-                score = (w_views * views) + (w_likes * likes) + (w_comments * comments_count)
+                upload_date = info.get("upload_date")
+                date_iso = to_iso_date(upload_date)
+                freshness = recency_boost(info.get("upload_date"))
+
+                score = (
+                    (w_views * views) +
+                    (w_likes * likes) +
+                    (w_comments * comments_count)
+                ) * (1 + freshness)
 
                 scored.append({
                     "video_id": info.get("video_id"),
