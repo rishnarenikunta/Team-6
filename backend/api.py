@@ -684,6 +684,7 @@ def get_narratives_enriched_videoDetails() -> list[dict[str, Any]]:
             "_id": 0,
             "channel_id": 1,
             "pfp_url": 1,
+            "name": 1,
         },
     )
     )
@@ -725,6 +726,7 @@ def get_narratives_enriched_videoDetails() -> list[dict[str, Any]]:
             "channel_id":     doc.get("channel_id", ""),
             "narrative_text": doc.get("narrative_title", ""),
             "creator_pfp":   creator.get("pfp_url", ""),
+            "channel_name": creator.get("name", ""),
             "date":           doc["date"].isoformat() if doc.get("date") else None,
             "claims":         claims_by_narrative.get(narrative_id, []),
             "metadata": {
@@ -797,7 +799,8 @@ def get_narrative_enriched_videoDetails(narrative_id: str) -> dict[str, Any]:
 
     creator = db["creators"].find_one(
     {"channel_id": doc.get("channel_id", "")},
-    {"_id": 0, "pfp_url": 1},
+    {"_id": 0, "pfp_url": 1, "name": 1},
+    
 ) or {}
 
     # ── 4. Sentiment label ────────────────────────────────────────────────────
@@ -822,6 +825,7 @@ def get_narrative_enriched_videoDetails(narrative_id: str) -> dict[str, Any]:
         "narrative_id":   narrative_id,
         "video_id":       video_id,
         "creator_pfp":   creator.get("pfp_url", ""),
+        "channel_name": creator.get("name", ""),
         "destination":    doc.get("destination", ""),
         "channel_id":     doc.get("channel_id", ""),
         "narrative_text": doc.get("narrative_title", ""),
