@@ -170,14 +170,14 @@ def get_risk_label(score):
 # CLUSTERING LOGIC
 # ==========================================
 
-def get_top_doc_from_cluster(docs, embeddings):
-    """Run UMAP + HDBSCAN, find the centroid, and generate a Gemini summary."""
+def get_top_clusters(docs, embeddings, max_clusters=3, min_cluster_size=2):
+    """Run UMAP + HDBSCAN, and return gemini summaries for up to 'max_clusters'."""
     n_samples = len(embeddings)
     n_components = min(50, n_samples - 1)
     n_neighbors = min(15, n_samples - 1)
 
     if n_components < 2:
-        return None, None, None, 0.0, "None"
+        return []
 
     reducer = umap.UMAP(
         n_components=n_components,
@@ -191,46 +191,61 @@ def get_top_doc_from_cluster(docs, embeddings):
     labels = clusterer.fit_predict(reduced)
 
     counts = Counter(labels)
-    counts.pop(-1, None)
+    counts.pop(-1, None) # Remove noise
 
     if not counts:
-        return None, None, None, 0.0, "None"
+        return []
 
-    top_cluster = counts.most_common(1)[0][0]
-    cluster_indices = [i for i, label in enumerate(labels) if label == top_cluster]
-    cluster_embeddings = embeddings[cluster_indices]
+    results = []
+    # Get up to 'max_clusters' (e.g., Top 3)
+    top_clusters = counts.most_common(max_clusters)
 
-    # --- Compute Average Risk for the Cluster ---
-    cluster_docs = [docs[i] for i in cluster_indices]
-    risk_scores = [get_risk_score(d) for d in cluster_docs]
-    avg_risk_score = sum(risk_scores) / len(risk_scores) if risk_scores else 0.0
-    avg_risk_label = get_risk_label(avg_risk_score)
-    # --------------------------------------------
+    for rank, (cluster_id, size) in enumerate(top_clusters, start=1):
+        if size < min_cluster_size:
+            continue
 
-    centroid = cluster_embeddings.mean(axis=0)
-    sims = cosine_similarity([centroid], cluster_embeddings)[0]
-    
-    # Sort indices by proximity to centroid
-    sorted_local_indices = np.argsort(sims)[::-1] 
-    
-    # Grab the top 5 closest texts to feed to Gemini
-    top_texts = []
-    for local_idx in sorted_local_indices[:5]:
-        global_idx = cluster_indices[local_idx]
-        # Handle both narratives and claims collections
-        text = docs[global_idx].get("narrative_title") or docs[global_idx].get("claim_title")
-        if text:
-            top_texts.append(text)
+        cluster_indices = [i for i, label in enumerate(labels) if label == cluster_id]
+        cluster_embeddings = embeddings[cluster_indices]
 
-    # Generate the synthesized narrative!
-    generated_text = summarize_cluster_with_gemini(top_texts)
+        # --- Compute Average Risk ---
+        cluster_docs = [docs[i] for i in cluster_indices]
+        risk_scores = [get_risk_score(d) for d in cluster_docs]
+        avg_risk_score = sum(risk_scores) / len(risk_scores) if risk_scores else 0.0
+        avg_risk_label = get_risk_label(avg_risk_score)
 
-    # Return the closest physical doc, the cluster size, and the generated text
-    best_global_idx = cluster_indices[sorted_local_indices[0]]
-    closest_doc = docs[best_global_idx]
+        # --- Centroid & Gemini Summary ---
+        centroid = cluster_embeddings.mean(axis=0)
+        sims = cosine_similarity([centroid], cluster_embeddings)[0]
+        
+        # Sort indices by proximity to centroid
+        sorted_local_indices = np.argsort(sims)[::-1] 
+        
+        # Grab the top 5 closest texts to feed to Gemini
+        top_texts = []
+        for local_idx in sorted_local_indices[:5]:
+            global_idx = cluster_indices[local_idx]
+            # Handle both narratives and claims collections
+            text = docs[global_idx].get("narrative_title") or docs[global_idx].get("claim_title")
+            if text:
+                top_texts.append(text)
 
-    return closest_doc, counts[top_cluster], generated_text, avg_risk_score, avg_risk_label
+        # Generate the synthesized narrative!
+        generated_text = summarize_cluster_with_gemini(top_texts)
 
+        # Return the closest physical doc, the cluster size, and the generated text
+        best_global_idx = cluster_indices[sorted_local_indices[0]]
+        closest_doc = docs[best_global_idx]
+
+        results.append({
+            "rank": rank,
+            "doc": closest_doc,
+            "size": size,
+            "text": generated_text,
+            "avg_risk_score": avg_risk_score,
+            "avg_risk_label": avg_risk_label
+        })
+
+    return results
 
 def filter_valid_docs(docs, vector_field, scope_type, type_id):
     """Filter out docs with missing, null, or inhomogeneous vectors."""
@@ -252,7 +267,7 @@ def filter_valid_docs(docs, vector_field, scope_type, type_id):
     return valid
 
 
-def compute_top_narrative(scope_type, scope_filter, type_id):
+def compute_top_narrative(scope_type, scope_filter, type_id, max_clusters=3):
     """
     scope_type:   "country" | "creator" | "overall"
     scope_filter: MongoDB query dict to filter narratives collection
@@ -264,26 +279,24 @@ def compute_top_narrative(scope_type, scope_filter, type_id):
     col = db["narratives"]
     docs = list(col.find(scope_filter))
 
+    # Clean the slate: Remove old clusters for this specific scope/ID
+    db["top_narratives"].delete_many({"type": scope_type, "typeID": type_id})
+
     # No docs at all — save a None record and exit
     if len(docs) == 0:
-        print(f"⚠️  No narratives found for {scope_type}={type_id}, saving null record")
-        db["top_narratives"].update_one(
-            {"type": scope_type, "typeID": type_id},
-            {"$set": {
-                "type":        scope_type,
-                "typeID":      type_id,
-                "narrativeID": None,
-                "narrative":   None,
-                "channel_id":  None,
-                "video_id":    None,
-                "clusterSize": None,
-                "totalDocs":   0,
-                "averageRiskScore": None,
-                "averageRiskLabel": None,
-                "computedAt":  datetime.now(timezone.utc)
-            }},
-            upsert=True
-        )
+        db["top_narratives"].insert_one({
+            "type":        scope_type,
+            "typeID":      type_id,
+            "clusterRank": 1,
+            "narrativeID": None,
+            "channel_id":  None,
+            "video_id":    None,
+            "clusterSize": 0,
+            "totalDocs":   0,
+            "averageRiskScore": None,
+            "averageRiskLabel": None,
+            "computedAt":  datetime.now(timezone.utc)
+        })
         return
 
     valid_docs = filter_valid_docs(docs, "narrative_vector", scope_type, type_id)
@@ -293,54 +306,56 @@ def compute_top_narrative(scope_type, scope_filter, type_id):
         fallback_doc = valid_docs[0] if valid_docs else docs[0]
         print(f"⚠️  Not enough valid vectors for {scope_type}={type_id}, using single fallback doc")
         avg_risk_score = get_risk_score(fallback_doc)
-        
-        db["top_narratives"].update_one(
-            {"type": scope_type, "typeID": type_id},
-            {"$set": {
-                "type":        scope_type,
-                "typeID":      type_id,
-                "narrativeID": fallback_doc.get("narrative_id"),
-                "narrative":   fallback_doc.get("narrative_title"),
-                "channel_id":  fallback_doc.get("channel_id"),
-                "video_id":    fallback_doc.get("video_id"),
-                "clusterSize": 1,
-                "totalDocs":   len(docs),
-                "averageRiskScore": avg_risk_score,
-                "averageRiskLabel": get_risk_label(avg_risk_score),
-                "computedAt":  datetime.now(timezone.utc)
-            }},
-            upsert=True
-        )
-        return
-    # Normal path — cluster and find top doc
-    embeddings = np.array([doc["narrative_vector"] for doc in valid_docs])
-    top_doc, cluster_size, generated_text, avg_risk_score, avg_risk_label = get_top_doc_from_cluster(valid_docs, embeddings)
-
-    if top_doc is None:
-        top_doc = valid_docs[0]
-        cluster_size = 1
-        generated_text = top_doc.get("narrative_title")
-        avg_risk_score = get_risk_score(top_doc)
-        avg_risk_label = get_risk_label(avg_risk_score)
-
-    db["top_narratives"].update_one(
-        {"type": scope_type, "typeID": type_id},
-        {"$set": {
-            "type":        scope_type,
-            "typeID":      type_id,
-            "narrativeID": top_doc.get("narrative_id"),
-            "narrative":   generated_text,
-            "channel_id":  top_doc.get("channel_id"),
-            "video_id":    top_doc.get("video_id"),
-            "clusterSize": cluster_size,
-            "totalDocs":   len(docs),
+        db["top_narratives"].insert_one({
+            "type": scope_type,
+            "typeID": type_id,
+            "clusterRank": 1,
+            "narrativeID": fallback_doc.get("narrative_id"),
+            "narrative": fallback_doc.get("narrative_title"),
+            "channel_ids":  [fallback_doc.get("channel_id")],
+            "video_ids":    [fallback_doc.get("video_id")],
+            "clusterSize": 1, "totalDocs": len(docs),
             "averageRiskScore": avg_risk_score,
-            "averageRiskLabel": avg_risk_label,
-            "computedAt":  datetime.now(timezone.utc)
-        }},
-        upsert=True
-    )
-    print(f"✅ narrative saved: {scope_type}={type_id} | Risk: {avg_risk_label}")
+            "averageRiskLabel": get_risk_label(avg_risk_score),
+            "computedAt": datetime.now(timezone.utc)
+        })
+        return
+
+    # Normal path — get multiple clusters
+    embeddings = np.array([doc["narrative_vector"] for doc in valid_docs])
+    clusters_data = get_top_clusters(valid_docs, embeddings, max_clusters=max_clusters, min_cluster_size=2)
+
+    # If clustering returned nothing, fall back
+    if not clusters_data:
+        fallback_doc = valid_docs[0]
+        avg_risk_score = get_risk_score(fallback_doc)
+        clusters_data = [{
+            "rank": 1,
+            "doc": fallback_doc,
+            "size": 1, 
+            "text": fallback_doc.get("narrative_title"),
+            "avg_risk_score": avg_risk_score,
+            "avg_risk_label": get_risk_label(avg_risk_score)
+        }]
+
+    # Save all found clusters
+    for cluster in clusters_data:
+        db["top_narratives"].insert_one({
+            "type": scope_type,
+            "typeID": type_id,
+            "clusterRank": cluster["rank"],           # <-- NEW: Track 1st, 2nd, 3rd
+            "narrativeID": cluster["doc"].get("narrative_id"),
+            "narrative": cluster["text"],
+            "channel_id": cluster["doc"].get("channel_id"),
+            "video_id": cluster["doc"].get("video_id"),
+            "clusterSize": cluster["size"],
+            "totalDocs": len(docs),
+            "averageRiskScore": cluster["avg_risk_score"],
+            "averageRiskLabel": cluster["avg_risk_label"],
+            "computedAt": datetime.now(timezone.utc)
+        })
+    
+    print(f"✅ Saved {len(clusters_data)} narratives for {scope_type}={type_id}")
 
 
 def compute_top_claim(scope_type, scope_filter, creator_id, country):
