@@ -358,34 +358,35 @@ def compute_top_narrative(scope_type, scope_filter, type_id, max_clusters=3):
     print(f"✅ Saved {len(clusters_data)} narratives for {scope_type}={type_id}")
 
 
-def compute_top_claim(scope_type, scope_filter, creator_id, country):
-
+def compute_top_claim(scope_type, scope_filter, creator_id, country, max_clusters=3):
     type_id = _make_type_id(scope_type, creator_id, country)
 
     col = db["claims"]
     docs = list(col.find(scope_filter))
 
+    # Clean the slate: Remove old clusters for this specific scope/ID
+    db["top_claims"].delete_many({"type": scope_type, "typeID": type_id})
+
     # No docs at all — save a None record and exit
     if len(docs) == 0:
         print(f"⚠️  No claims found for {scope_type}={type_id}, saving null record")
-        db["top_claims"].update_one(
-            {"type": scope_type, "typeID": type_id},
-            {"$set": {
-                "type":        scope_type,
-                "typeID":      type_id,
-                "creatorID":   None,
-                "country":     country,
-                "claimID":     None,
-                "claimText":   None,
-                "narrativeID": None,
-                "clusterSize": None,
-                "totalDocs":   0,
-                "averageRiskScore": None,
-                "averageRiskLabel": None,
-                "computedAt":  datetime.now(timezone.utc)
-            }},
-            upsert=True
-        )
+        db["top_claims"].insert_one({
+            "type":        scope_type,
+            "typeID":      type_id,
+            "clusterRank": 1,
+            "creatorID":   creator_id,
+            "country":     country,
+            "claimID":     None,
+            "claimText":   None,
+            "narrativeID": None,
+            "channel_id":  None,
+            "video_id":    None,
+            "clusterSize": 0,
+            "totalDocs":   0,
+            "averageRiskScore": None,
+            "averageRiskLabel": None,
+            "computedAt":  datetime.now(timezone.utc)
+        })
         return
 
     valid_docs = filter_valid_docs(docs, "claim_vector", scope_type, type_id)
@@ -396,60 +397,64 @@ def compute_top_claim(scope_type, scope_filter, creator_id, country):
         print(f"⚠️  Not enough valid vectors for {scope_type}={type_id}, using single fallback doc")
         avg_risk_score = get_risk_score(fallback_doc)
         
-        db["top_claims"].update_one(
-            {"type": scope_type, "typeID": type_id},
-            {"$set": {
-                "type":        scope_type,
-                "typeID":      type_id,
-                "creatorID":   fallback_doc.get("source"),
-                "country":     country,
-                "claimID":     fallback_doc.get("_id"),
-                "claimText":   fallback_doc.get("claim_title"),
-                "narrativeID": fallback_doc.get("narrative_id"),
-                "clusterSize": 1,
-                "totalDocs":   len(docs),
-                "averageRiskScore": avg_risk_score,
-                "averageRiskLabel": get_risk_label(avg_risk_score),
-                "computedAt":  datetime.now(timezone.utc)
-            }},
-            upsert=True
-        )
-        return
-
-    # Normal path — cluster and find top doc
-    embeddings = np.array([doc["claim_vector"] for doc in valid_docs])
-    top_doc, cluster_size, generated_text, avg_risk_score, avg_risk_label = get_top_doc_from_cluster(valid_docs, embeddings)
-
-    # Clustering returned nothing — fall back to first valid doc
-    if top_doc is None:
-        print(f"⚠️  No cluster found for {scope_type}={type_id}, using single fallback doc")
-        top_doc = valid_docs[0]
-        cluster_size = 1
-        generated_text = top_doc.get("claim_title")
-        avg_risk_score = get_risk_score(top_doc)
-        avg_risk_label = get_risk_label(avg_risk_score)
-
-    db["top_claims"].update_one(
-        {"type": scope_type, "typeID": type_id},
-        {"$set": {
+        db["top_claims"].insert_one({
             "type":        scope_type,
             "typeID":      type_id,
-            "creatorID":   top_doc.get("source"),
+            "clusterRank": 1,
+            "creatorID":   fallback_doc.get("source"),
             "country":     country,
-            "claimID":     top_doc["_id"],
-            "claimText":   generated_text,
-            "narrativeID": top_doc.get("narrative_id"),
-            "channel_id":  top_doc.get("channel_id"),
-            "video_id":    top_doc.get("video_id"),
-            "clusterSize": cluster_size,
+            "claimID":     fallback_doc.get("_id"),
+            "claimText":   fallback_doc.get("claim_title"),
+            "narrativeID": fallback_doc.get("narrative_id"),
+            "channel_id":  fallback_doc.get("channel_id"),
+            "video_id":    fallback_doc.get("video_id"),
+            "clusterSize": 1,
             "totalDocs":   len(docs),
             "averageRiskScore": avg_risk_score,
-            "averageRiskLabel": avg_risk_label,
+            "averageRiskLabel": get_risk_label(avg_risk_score),
             "computedAt":  datetime.now(timezone.utc)
-        }},
-        upsert=True
-    )
-    print(f"✅ claim saved: {scope_type}={type_id} | Risk: {avg_risk_label}")
+        })
+        return
+
+    # Normal path — get multiple clusters
+    embeddings = np.array([doc["claim_vector"] for doc in valid_docs])
+    clusters_data = get_top_clusters(valid_docs, embeddings, max_clusters=max_clusters, min_cluster_size=2)
+
+    # Clustering returned nothing — fall back to first valid doc
+    if not clusters_data:
+        print(f"⚠️  No cluster found for {scope_type}={type_id}, using single fallback doc")
+        fallback_doc = valid_docs[0]
+        avg_risk_score = get_risk_score(fallback_doc)
+        clusters_data = [{
+            "rank": 1,
+            "doc": fallback_doc,
+            "size": 1,
+            "text": fallback_doc.get("claim_title"),
+            "avg_risk_score": avg_risk_score,
+            "avg_risk_label": get_risk_label(avg_risk_score)
+        }]
+
+    # Save all found clusters
+    for cluster in clusters_data:
+        db["top_claims"].insert_one({
+            "type":        scope_type,
+            "typeID":      type_id,
+            "clusterRank": cluster["rank"],
+            "creatorID":   cluster["doc"].get("source"),
+            "country":     country,
+            "claimID":     cluster["doc"].get("_id"),
+            "claimText":   cluster["text"],
+            "narrativeID": cluster["doc"].get("narrative_id"),
+            "channel_id":  cluster["doc"].get("channel_id"),
+            "video_id":    cluster["doc"].get("video_id"),
+            "clusterSize": cluster["size"],
+            "totalDocs":   len(docs),
+            "averageRiskScore": cluster["avg_risk_score"],
+            "averageRiskLabel": cluster["avg_risk_label"],
+            "computedAt":  datetime.now(timezone.utc)
+        })
+        
+    print(f"✅ Saved {len(clusters_data)} claims for {scope_type}={type_id}")
 
 
 def _make_type_id(scope_type, creator_id, country):
