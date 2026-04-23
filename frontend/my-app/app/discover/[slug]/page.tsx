@@ -181,6 +181,43 @@ export default function DestinationPage() {
             </div>
           </section>
         )}
+          <section className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-[0.25em] text-gray-400">Top Narratives</p>
+                <p className="text-sm text-gray-400">Top narratives from {destination.name}.</p>
+              </div>
+              <span className="text-xs text-gray-400">{destination.claims.length} total</span>
+            </div>
+            <div className="flex gap-4 overflow-x-auto pb-2">
+              {destination.claims.map((claim, i) => {
+                const risk = (claim.claim_risk ?? "").toLowerCase()
+                const isHigh = risk.includes("high")
+                const isLow = risk.includes("low")
+                return (
+                  <div
+                    key={i}
+                    className="min-w-[260px] max-w-[280px] rounded-2xl border border-white/10 bg-gradient-to-b from-[#151525] via-[#11111a] to-[#0c0c12] p-4 shadow-lg shadow-black/40 flex flex-col gap-2"
+                  >
+                    <span className={`self-start text-[11px] px-2 py-1 rounded-full border ${
+                      isHigh
+                        ? "border-rose-300/40 text-rose-200 bg-rose-400/10"
+                        : isLow
+                        ? "border-emerald-400/40 text-emerald-200 bg-emerald-400/10"
+                        : "border-amber-300/40 text-amber-200 bg-amber-300/10"
+                    }`}>
+                      {claim.claim_risk || "unknown risk"}
+                    </span>
+                    <p className="text-sm text-gray-100 leading-snug">"{claim.claim_text}"</p>
+                    <p className="text-xs text-gray-500 mt-auto">
+                      {claim.source}
+                      {claim.date ? ` · ${new Date(claim.date).toLocaleDateString()}` : ""}
+                    </p>
+                  </div>
+                )
+              })}
+            </div>
+        </section>
       </div>
     </div>
   )
