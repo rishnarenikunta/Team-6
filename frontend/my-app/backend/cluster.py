@@ -437,7 +437,9 @@ def compute_top_claim(scope_type, scope_filter, creator_id, country, max_cluster
             "size": 1,
             "text": fallback_doc.get("claim_title"),
             "avg_risk_score": avg_risk_score,
-            "avg_risk_label": get_risk_label(avg_risk_score)
+            "avg_risk_label": get_risk_label(avg_risk_score),
+            "cluster_channels": [fallback_doc.get("channel_id")] if fallback_doc.get("channel_id") else [],
+            "cluster_videos": [fallback_doc.get("video_id")] if fallback_doc.get("video_id") else []
         }]
 
     # Save all found clusters
@@ -451,12 +453,12 @@ def compute_top_claim(scope_type, scope_filter, creator_id, country, max_cluster
             "claimID":     cluster["doc"].get("_id"),
             "claimText":   cluster["text"],
             "narrativeID": cluster["doc"].get("narrative_id"),
-            "channel_id":  cluster["doc"].get("channel_id"),
-            "video_id":    cluster["doc"].get("video_id"),
             "clusterSize": cluster["size"],
             "totalDocs":   len(docs),
             "averageRiskScore": cluster["avg_risk_score"],
             "averageRiskLabel": cluster["avg_risk_label"],
+            "includedChannels": cluster["cluster_channels"],
+            "includedVideos": cluster["cluster_videos"],
             "computedAt":  datetime.now(timezone.utc)
         })
         
