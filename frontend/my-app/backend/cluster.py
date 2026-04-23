@@ -214,6 +214,9 @@ def get_top_clusters(docs, embeddings, max_clusters=3, min_cluster_size=2):
         avg_risk_score = sum(risk_scores) / len(risk_scores) if risk_scores else 0.0
         avg_risk_label = get_risk_label(avg_risk_score)
 
+        # Extract all unique channel and video IDs in this cluster
+        cluster_channels = list(set(d.get("channel_id") for d in cluster_docs if d.get("channel_id")))
+        cluster_videos = list(set(d.get("video_id") for d in cluster_docs if d.get("video_id")))
         # --- Centroid & Gemini Summary ---
         centroid = cluster_embeddings.mean(axis=0)
         sims = cosine_similarity([centroid], cluster_embeddings)[0]
@@ -326,7 +329,7 @@ def compute_top_narrative(scope_type, scope_filter, type_id, max_clusters=3):
     embeddings = np.array([doc["narrative_vector"] for doc in valid_docs])
     clusters_data = get_top_clusters(valid_docs, embeddings, max_clusters=max_clusters, min_cluster_size=2)
 
-    # If clustering returned nothing, fall back
+    # If clustering returned nothing, fall back and wrap the single doc's IDs in a list
     if not clusters_data:
         fallback_doc = valid_docs[0]
         avg_risk_score = get_risk_score(fallback_doc)
@@ -336,7 +339,9 @@ def compute_top_narrative(scope_type, scope_filter, type_id, max_clusters=3):
             "size": 1, 
             "text": fallback_doc.get("narrative_title"),
             "avg_risk_score": avg_risk_score,
-            "avg_risk_label": get_risk_label(avg_risk_score)
+            "avg_risk_label": get_risk_label(avg_risk_score),
+            "cluster_channels": [fallback_doc.get("channel_id")] if fallback_doc.get("channel_id") else [],
+            "cluster_videos": [fallback_doc.get("video_id")] if fallback_doc.get("video_id") else []
         }]
 
     # Save all found clusters
@@ -344,15 +349,15 @@ def compute_top_narrative(scope_type, scope_filter, type_id, max_clusters=3):
         db["top_narratives"].insert_one({
             "type": scope_type,
             "typeID": type_id,
-            "clusterRank": cluster["rank"],           # <-- NEW: Track 1st, 2nd, 3rd
+            "clusterRank": cluster["rank"], # Track 1st, 2nd, 3rd
             "narrativeID": cluster["doc"].get("narrative_id"),
             "narrative": cluster["text"],
-            "channel_id": cluster["doc"].get("channel_id"),
-            "video_id": cluster["doc"].get("video_id"),
             "clusterSize": cluster["size"],
             "totalDocs": len(docs),
             "averageRiskScore": cluster["avg_risk_score"],
             "averageRiskLabel": cluster["avg_risk_label"],
+            "includedChannels": cluster["cluster_channels"],
+            "includedVideos": cluster["cluster_videos"],
             "computedAt": datetime.now(timezone.utc)
         })
     
