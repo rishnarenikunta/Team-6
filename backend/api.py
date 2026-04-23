@@ -165,6 +165,10 @@ def get_destinations(region: Optional[str]= None, tag: Optional[str]= None) -> l
 
 @app.get("/api/destinations/{destination_name}/overview")
 def get_destination_overview(destination_name: str) -> dict[str, Any]:
+    def _iso(value: Any) -> Any:
+        if hasattr(value, "isoformat"):
+            return value.isoformat()
+        return value
 
     # ── 1. Count metadata docs where destinations array contains this destination
     videos_analyzed = db["metadata"].count_documents(
@@ -218,12 +222,75 @@ def get_destination_overview(destination_name: str) -> dict[str, Any]:
 
     top_narrative = None
     if top_narrative_doc:
+        creators = list(db["creators"].find({}, {"_id": 0}))
+        creator_map = {c.get("channel_id", ""): c for c in creators}
+        top_creator_id = top_narrative_doc.get("channel_id", "")
         top_narrative = {
             "narrative":    top_narrative_doc.get("narrative", ""),
+            "narrative_id": top_narrative_doc.get("narrativeID"),
+            "video_id":     top_narrative_doc.get("video_id"),
+            "destination":  canonical_name,
             "cluster_size": top_narrative_doc.get("clusterSize", 0),
             "computed_at":  top_narrative_doc["computedAt"].isoformat() if top_narrative_doc.get("computedAt") else None,
             "total_docs":   top_narrative_doc.get("totalDocs", 0),
+            "source":       top_creator_id,
+            "creator_name": creator_map.get(top_creator_id, {}).get("name", ""),
         }
+
+    # ── 6. Narratives list for this destination (raw narratives collection) ───
+    narrative_docs = list(
+        db["narratives"]
+        .find(
+            {"destination": {"$regex": f"^{canonical_name}$", "$options": "i"}},
+            {"narrative_vector": 0},
+        )
+        .sort("date", -1)
+        .limit(25)
+    )
+
+    creators = list(db["creators"].find({}, {"_id": 0}))
+    creator_map = {c.get("channel_id", ""): c for c in creators}
+
+    narrative_video_ids = [doc.get("video_id") for doc in narrative_docs if doc.get("video_id")]
+    meta_docs = (
+        list(
+            db["metadata"].find(
+                {"video_id": {"$in": narrative_video_ids}},
+                {"_id": 0, "video_id": 1, "title": 1, "webpage_url": 1, "upload_date": 1, "stats": 1},
+            )
+        )
+        if narrative_video_ids
+        else []
+    )
+    meta_by_video = {m.get("video_id", ""): m for m in meta_docs if m.get("video_id")}
+
+    narratives: list[dict[str, Any]] = []
+    for doc in narrative_docs:
+        video_id = doc.get("video_id", "")
+        channel_id = doc.get("channel_id", "")
+        meta = meta_by_video.get(video_id, {})
+        stats = meta.get("stats", {}) or {}
+
+        narratives.append(
+            {
+                "id": str(doc.get("_id", "")),
+                "narrative_id": doc.get("narrative_id", ""),
+                "text": doc.get("narrative_text") or doc.get("narrative_title") or "",
+                "destination": doc.get("destination", canonical_name),
+                "date": _iso(doc.get("date")),
+                "source": channel_id,
+                "creator_name": creator_map.get(channel_id, {}).get("name", ""),
+                "video": {
+                    "video_id": video_id,
+                    "title": meta.get("title", ""),
+                    "webpage_url": meta.get("webpage_url", ""),
+                    "upload_date": _iso(meta.get("upload_date")),
+                    "view_count": stats.get("view_count"),
+                    "like_count": stats.get("like_count"),
+                    "comment_count": stats.get("comment_count"),
+                },
+            }
+        )
 
     # ── 6. Assemble response ──────────────────────────────────────────────────
     return {
@@ -232,6 +299,7 @@ def get_destination_overview(destination_name: str) -> dict[str, Any]:
         "total_claims":      total_claims,
         "total_narratives":  total_narratives,
         "top_narrative":     top_narrative,
+        "narratives":        narratives,
         "top_claim":        {
             "claim_text": top_claim_doc.get("claimText", "") if top_claim_doc else None,
             "cluster_size": top_claim_doc.get("clusterSize", 0) if top_claim_doc else None,

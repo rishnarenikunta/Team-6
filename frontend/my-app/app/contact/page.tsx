@@ -10,7 +10,7 @@ const team = [
   },
   {
     name: "Nidhi Majoju",
-    role: "Scrum Master / Backend Developer",
+    role: "Scrum Master / Data Scientist",
     // focus: "Roadmap, delivery, and data science workflows",
   },
   {
