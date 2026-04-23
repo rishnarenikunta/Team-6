@@ -1,0 +1,51 @@
+name: Deploy Frontend
+
+on:
+  push:
+    branches:
+      - integration
+    paths:
+      - 'frontend/my-app/**' # Only triggers if frontend files change
+
+env:
+  PROJECT_ID: 'youtravel-487521'
+  REGION: 'us-central1'
+
+jobs:
+  deploy-frontend:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: 'projects/528253522819/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider'
+          service_account: 'github-actions-sa@youtravel-487521.iam.gserviceaccount.com'
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker to use Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
+
+      - name: Build and Push Docker Image
+        run: |
+          IMAGE_NAME=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/frontend-repo/my-app:${{ github.sha }}
+          docker build \
+            --build-arg NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }} \
+            -t $IMAGE_NAME ./frontend/my-app
+          docker push $IMAGE_NAME
+
+      - name: Deploy to Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: frontend-service
+          image: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/frontend-repo/my-app:${{ github.sha }}
+          region: ${{ env.REGION }}
+          flags: '--allow-unauthenticated'

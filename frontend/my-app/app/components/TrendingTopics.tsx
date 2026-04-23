@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 
 export default function TrendingTopics() {
   const router = useRouter()
-  const [topics, setTopics] = useState<string[]>([])
+  const [topics, setTopics] = useState([])
 
   useEffect(() => {
     async function fetchTopics() {
@@ -13,7 +13,8 @@ export default function TrendingTopics() {
         const res = await fetch("http://127.0.0.1:8000/api/topics/trending")
         const data = await res.json()
         setTopics(data.topics)
-        console.log("Number of trending topics:", data.length)
+        console.log("Number of trending topics:", data.topics.length)
+        console.log("Trending topics data:", data.topics)
       } catch (error) {
         console.error("Failed to fetch topics:", error)
       }
@@ -22,28 +23,34 @@ export default function TrendingTopics() {
     fetchTopics()
   }, [])
 
+  //get the first 15 topics or all if less than 15
+  const displayedTopics = topics.slice(0, 15)
+
   return (
-    <div className="w-full px-8 py-8">
-      <h2 className="text-2xl font-semibold text-white mb-6 tracking-tight">
+    <div className="w-full p-3 text-foreground space-y-3">
+      {/* Section Title */}
+      <h2 className="text-sm font-semibold text-gray-300">
         Trending Topics
       </h2>
 
       <div className="flex gap-3 overflow-x-auto whitespace-nowrap no-scrollbar">
-        {topics.map((topic) => (
+        {displayedTopics.map((topic) => (
           <button
             key={topic}
-            onClick={() => router.push(`/discover?q=${topic}`)}
+            onClick={() => router.push(`/discover/${encodeURIComponent(String(topic))}`)}
             className="
-              flex-shrink-0
-              px-5 py-2
-              text-sm font-medium
-              text-gray-300
-              border border-neutral-800
               rounded-full
-              hover:border-neutral-600
-              hover:text-white
-              hover:shadow-[0_0_12px_rgba(255,255,255,0.05)]
-              transition-all duration-200
+              border 
+              border-white/10 
+              bg-white/5 
+              px-4 
+              py-2 
+              text-xs 
+              text-gray-200 
+              transition 
+              hover:border-white/25 
+              hover:bg-[#E4CAFF] 
+              hover:text-[#1c1b22]
             "
           >
             {topic}

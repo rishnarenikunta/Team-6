@@ -14,8 +14,6 @@ interface Narrative {
   views: number;
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-
 export default function TrendingNarratives() {
   const [narratives, setNarratives] = useState<Narrative[]>([]);
   const [selected, setSelected] = useState<Narrative | null>(null);
@@ -23,7 +21,7 @@ export default function TrendingNarratives() {
   useEffect(() => {
     async function fetchNarratives() {
       try {
-        const res = await fetch(`${API_BASE}/api/narratives/trending`);
+        const res = await fetch(`/api/narratives/trending`);
         if (!res.ok) throw new Error(`API error ${res.status}`);
         const data: Narrative[] = await res.json();
         setNarratives(data);
@@ -36,24 +34,33 @@ export default function TrendingNarratives() {
     fetchNarratives();
   }, []);
 
+  // only display narratives with a destination and text and only the top 10 or min(narratives.length, 10 and unique text
+  const filteredNarratives = narratives.filter(narrative => narrative.destination && narrative.text);
+  const uniqueNarrativesMap = new Map<string, Narrative>();
+  filteredNarratives.forEach(narrative => {
+    if (!uniqueNarrativesMap.has(narrative.text)) {
+      uniqueNarrativesMap.set(narrative.text, narrative);
+    }
+  });
+  const uniqueNarratives = Array.from(uniqueNarrativesMap.values());
+  const displayedNarratives = uniqueNarratives.slice(0, 6);
+
+
   return (
-    <div className="w-full h-dvh p-8 mt-6">
-      <h2 className="text-3xl font-semibold text-white tracking-tight mb-2">
+    <div className="w-full mt-10 h-fit mb-50">
+      <h2 className="text-2xl font-semibold text-white tracking-tight mb-2">
         Trending Narratives
       </h2>
-      <p className="text-sm text-neutral-400 border-b border-neutral-800 pb-4 mb-4">
-        Narratives represent AI-clustered story themes emerging across travel videos.
-      </p>
-
+      <p className="text-sm text-neutral-400 border-b border-neutral-800 pb-4 mb-4">Narratives represent AI-clustered story themes emerging across travel videos.</p>
       <div className="relative flex gap-16 text-white">
 
         {/* LEFT SIDE LIST */}
         <div className="flex flex-col gap-4 w-1/2 mt-8">
-          {narratives.map((item) => (
+          {displayedNarratives.map((item) => (
             <motion.p
               key={item.id}
               onClick={() => setSelected(item)}
-              className="cursor-pointer text-2xl text-gray-300 hover:text-purple-300 transition pl-5"
+              className="cursor-pointer text-md text-gray-300 hover:text-purple-300 transition pl-5 mr-5"
               whileHover={{ x: 5 }}
             >
               "{item.text}"
