@@ -25,7 +25,8 @@ print("\n=== DIAGNOSTIC ===")
 
 creator_ids = db["creators"].distinct("channel_id")
 narrative_channel_ids = db["narratives"].distinct("channel_id")
-claim_channel_ids = db["claims"].distinct("channel_id")
+narrative_ids = db["claims"].distinct("narrative_id")
+claim_channel_ids = db["narratives"].distinct("channel_id", {"_id": {"$in": narrative_ids}})
 
 print(f"Creators in 'creators' collection: {len(creator_ids)}")
 print(f"Distinct channel_ids in 'narratives': {len(narrative_channel_ids)}")
@@ -95,7 +96,7 @@ class GeminiRotator:
         raise RuntimeError("Max retries exhausted across all available Gemini API keys.")
 
 gemini_rotator = GeminiRotator(GEMINI_KEYS_ENV)
-GENERATION_MODEL = "gemini-3.1-flash" # Ideal for fast, structured text summarization
+GENERATION_MODEL = "gemini-3.1-flash-lite-preview" # Ideal for fast, structured text summarization
 
 # ==========================================
 # SUMMARIZATION LOGIC
