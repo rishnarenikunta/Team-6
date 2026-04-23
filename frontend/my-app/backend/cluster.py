@@ -26,7 +26,7 @@ print("\n=== DIAGNOSTIC ===")
 creator_ids = db["creators"].distinct("channel_id")
 narrative_channel_ids = db["narratives"].distinct("channel_id")
 narrative_ids = db["claims"].distinct("narrative_id")
-claim_channel_ids = db["narratives"].distinct("channel_id", {"_id": {"$in": narrative_ids}})
+claim_channel_ids = db["narratives"].distinct("channel_id", {"narrative_id": {"$in": narrative_ids}})
 
 print(f"Creators in 'creators' collection: {len(creator_ids)}")
 print(f"Distinct channel_ids in 'narratives': {len(narrative_channel_ids)}")
