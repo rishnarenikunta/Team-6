@@ -1,16 +1,16 @@
 import Link from "next/link"
 
-const contactEmail = "hello@youtravel.ai"
+const contactEmail = "Rishna.renikunta@gmail.com"
 
 const team = [
   {
     name: "Rishna Renikunta",
-    role: "Team Lead",
+    role: "Team Lead / Backend Developer",
     // focus: "Backend architecture, APIs, and integrations",
   },
   {
     name: "Nidhi Majoju",
-    role: "Scrum Master",
+    role: "Scrum Master / Backend Developer",
     // focus: "Roadmap, delivery, and data science workflows",
   },
   {
@@ -20,17 +20,17 @@ const team = [
   },
   {
     name: "Aaryaa Moharir",
-    role: "Backend Engineer",
+    role: "Backend Developer",
     // focus: "Pipelines, services, and performance",
   },
   {
     name: "Abhiram Tadepalli",
-    role: "Data Scientist / Engineer",
+    role: "Data Scientist",
     // focus: "Modeling, analytics, and product instrumentation",
   },
   {
     name: "Zubiya Syeda",
-    role: "Frontend Engineer",
+    role: "Frontend Developer",
     // focus: "UX, UI systems, and Next.js implementation",
   },
 ]
