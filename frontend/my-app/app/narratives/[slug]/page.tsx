@@ -74,6 +74,10 @@ export default async function NarrativeDetailPage({ params }: Params) {
 
   const creatorName = creatorMap[narrative.channel_id] || narrative.channel_id;
 
+  const pfpRes = await fetch(`${API_BASE}/api/creators/${narrative.channel_id}/pfp`, { cache: "no-store" })
+  const creatorPfp = pfpRes.ok ? (await pfpRes.json())?.pfp_url ?? null : null
+  console.log(`Fetched creator PFP for ${creatorName} (${narrative.channel_id}):`, creatorPfp);
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#0b0b10] via-[#0f1018] to-[#0b0b10] text-white">
       <div className="max-w-6xl mx-auto px-6 pb-16 pt-12 space-y-10">
@@ -97,15 +101,39 @@ export default async function NarrativeDetailPage({ params }: Params) {
               Sentiment score: {narrative.metadata?.sentiment_score ?? "—"}
             </span>
             <span className="rounded-full bg-white/10 text-gray-200 px-3 py-1 text-xs border border-white/10">
-              Date: {narrative.date ? new Date(narrative.date).toLocaleString() : "—"}
-            </span>
-            <span className="rounded-full bg-white/10 text-gray-200 px-3 py-1 text-xs border border-white/10">
               Views: {narrative.video_stats?.view_count?.toLocaleString() ?? "—"}
             </span>
           </div>
           <h3 className="text-sm uppercase tracking-[0.25em] text-gray-400">Narrative overview</h3>
           <h1 className="text-4xl font-semibold leading-tight">{narrative.narrative_text}</h1>
           <p className="text-base text-gray-300 max-w-3xl">{narrative.destination}</p>
+
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner shadow-black/30">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-11 w-11 rounded-full border border-white/10 bg-white/10 overflow-hidden flex items-center justify-center">
+                  {creatorPfp ? (
+                    <img src={creatorPfp} alt={creatorName} className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="text-[11px] text-gray-200">YT</span>
+                  )}
+                </div>
+                <div className="leading-tight">
+                  <p className="text-[11px] uppercase tracking-wide text-gray-400">Creator</p>
+                  <Link href={`/creators/${narrative.channel_id}`} className="text-sm text-gray-100 hover:underline hover:underline-offset-4">
+                    {creatorName}
+                  </Link>
+                </div>
+              </div>
+
+              <div className="sm:text-right">
+                <p className="text-[11px] uppercase tracking-wide text-gray-400">Narrative date</p>
+                <p className="text-lg font-semibold text-white">
+                  {narrative.date ? new Date(narrative.date).toLocaleString() : "—"}
+                </p>
+              </div>
+            </div>
+          </div>
         </header>
 
         {/* Metrics */}
@@ -116,7 +144,7 @@ export default async function NarrativeDetailPage({ params }: Params) {
           <MetricCard label="Sentiment" value={narrative.metadata.sentiment_score?.toString() || "Not available"} />
         </section>
 
-        {/* Creator — now shows name instead of channel_id */}
+        {/* Creator */}
         <section className="space-y-3">
           <div className="flex items-center justify-between">
             <div>
@@ -125,13 +153,24 @@ export default async function NarrativeDetailPage({ params }: Params) {
             </div>
             <span className="text-xs text-gray-400">1 highlighted</span>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Link href={`/creators/${narrative.channel_id}`} className="hover:underline hover:underline-offset-4">
-              <span className="rounded-full bg-white/5 border border-white/10 px-3 py-2 text-xs text-gray-200">
+          <Link
+            href={`/creators/${narrative.channel_id}`}
+            className="group flex items-center gap-3 rounded-2xl border border-white/10 bg-gradient-to-b from-[#151525] via-[#11111a] to-[#0c0c12] p-4 shadow-lg shadow-black/40 hover:-translate-y-0.5 transition"
+          >
+            <div className="h-12 w-12 rounded-full border border-white/10 bg-white/10 overflow-hidden flex items-center justify-center">
+              {creatorPfp ? (
+                <img src={creatorPfp} alt={creatorName} className="h-full w-full object-cover" />
+              ) : (
+                <span className="text-[11px] text-gray-200">YT</span>
+              )}
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-white truncate group-hover:text-[#E4CAFF]">
                 {creatorName}
-              </span>
-            </Link>
-          </div>
+              </p>
+              <p className="text-xs text-gray-400 truncate">{narrative.channel_id}</p>
+            </div>
+          </Link>
         </section>
 
         {/* Claims */}

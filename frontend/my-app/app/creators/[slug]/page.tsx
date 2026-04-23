@@ -33,6 +33,7 @@ type ApiContentCreatorResponse = {
     computed_at: string
     total_docs: number
   }[]
+  creator_pfp?: string | null
 }
 
 const formatNumber = (value: number) =>
@@ -99,10 +100,12 @@ export default function CreatorDetailPage() {
         const data: ApiContentCreatorResponse = await res.json()
         if (!cancelled) setCreator(data)
         console.log("Fetched creator data:", data)
-        const pfpRes = await fetch(`/api/${data.channel_id}/pfp`, { cache: "no-store" })
+        const pfpRes = await fetch(`/api/creators/${slug}/pfp`, { cache: "no-store" })
         if (pfpRes.ok) {
-          const pfpData = await pfpRes.json()
-          if (!cancelled) setPfp(pfpData.pfp_url)
+          const pfpData: { pfp_url?: string } = await pfpRes.json()
+          if (!cancelled) setPfp(pfpData?.pfp_url ?? null)
+        } else {
+          if (!cancelled) setPfp(null)
         }
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : "Failed to fetch creator"
@@ -132,7 +135,7 @@ export default function CreatorDetailPage() {
     )
   }
 
-  const avatar = pfp || (creator.videos.length > 0 ? `https://i.ytimg.com/vi/${creator.videos[0].video_id}/hqdefault.jpg` : null)
+  const avatar = pfp
   const recentVideoViews = creator.videos.reduce((sum, video) => sum + (Number.isFinite(video.view_count) ? video.view_count : 0), 0)
   const recentVideoLikes = creator.videos.reduce((sum, video) => sum + (Number.isFinite(video.like_count) ? video.like_count : 0), 0)
   const recentVideoComments = creator.videos.reduce((sum, video) => sum + (Number.isFinite(video.comment_count) ? video.comment_count : 0), 0)
@@ -165,12 +168,12 @@ export default function CreatorDetailPage() {
           <span className="text-gray-200">{creator.creator_name}</span>
         </div>
 
-        <header className="space-y-4">
-          <div className="flex items-start gap-4">
-            <div className="h-16 w-16 rounded-full border border-white/10 bg-gradient-to-br from-purple-500/30 to-indigo-500/30 overflow-hidden flex items-center justify-center">
-              {avatar ? <img src={avatar} alt={creator.creator_name} className="h-full w-full object-cover" /> : <span className="text-xs text-gray-100">YT</span>}
-            </div>
-            <div className="space-y-3">
+	        <header className="space-y-4">
+	          <div className="flex items-start gap-4">
+	            <div className="h-16 w-16 rounded-full border border-white/10 bg-gradient-to-br from-purple-500/30 to-indigo-500/30 overflow-hidden flex items-center justify-center">
+	              {avatar ? <img src={avatar} alt={creator.creator_name} className="h-full w-full object-cover" /> : <span className="text-xs text-gray-100">YT</span>}
+	            </div>
+	            <div className="space-y-3">
               <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-wide text-gray-200">
                 <span className="rounded-full bg-emerald-500/15 text-emerald-200 px-3 py-1">{formatNumber(creator.subscriber_count)} subs</span>
                 <span title={viewsTitle} className="rounded-full bg-white/10 px-3 py-1">{formatNumber(creatorViews)} views</span>
