@@ -514,7 +514,7 @@ def get_creator_pfp(channel_id: str) -> dict[str, Any]:
 
 @app.get("/api/narratives")
 def list_narratives(
-    destination: str | None = None,
+    destination: Optional[str] = None,
     limit: int = 20,
     offset: int = 0,
 ) -> dict[str, Any]:
@@ -694,7 +694,7 @@ def get_narratives_enriched_videoDetails() -> list[dict[str, Any]]:
     }
 
     # ── 4. Shared helper: sentiment label ─────────────────────────────────────
-    def sentiment_label(score) -> str | None:
+    def sentiment_label(score) -> Optional[str]:
         if score is None:
             return None
         if score >= 0.66:

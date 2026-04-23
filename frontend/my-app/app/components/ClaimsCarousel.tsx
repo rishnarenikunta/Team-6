@@ -13,7 +13,6 @@ interface Claim {
   computed_at: string | null;
   source: string;        // channel_id
   creator_name: string;
-  views: number;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -105,7 +104,7 @@ export default function ClaimsCarousel() {
             </p>
             <div className="mt-3 space-y-1 text-sm text-gray-400">
               <p className="font-medium text-gray-200">
-                {claim.creator_name || "Unknown creator"} · {claim.views.toLocaleString()} views
+                {claim.creator_name || "Unknown creator"}
               </p>
               <p className="text-gray-400">
                 Based on {claim.cluster_size} similar claims

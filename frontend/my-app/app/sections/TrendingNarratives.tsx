@@ -11,7 +11,6 @@ interface Narrative {
   computed_at: string | null;
   source: string;
   creator_name: string;
-  views: number;
 }
 
 export default function TrendingNarratives() {
@@ -93,10 +92,6 @@ export default function TrendingNarratives() {
                   <div className="text-sm">Similar Narratives</div>
                 </div>
 
-                <div>
-                  <div className="text-3xl font-bold">{selected.views.toLocaleString()}</div>
-                  <div className="text-sm">Views</div>
-                </div>
 
                 <div>
                   <div className="text-3xl font-bold truncate">{selected.creator_name || selected.source}</div>
