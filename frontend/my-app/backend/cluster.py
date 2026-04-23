@@ -246,7 +246,9 @@ def get_top_clusters(docs, embeddings, max_clusters=3, min_cluster_size=2):
             "size": size,
             "text": generated_text,
             "avg_risk_score": avg_risk_score,
-            "avg_risk_label": avg_risk_label
+            "avg_risk_label": avg_risk_label,
+            "cluster_channels": cluster_channels,
+            "cluster_videos": cluster_videos
         })
 
     return results
