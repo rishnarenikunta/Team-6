@@ -30,23 +30,38 @@ export default function DestinationPage() {
   const [notFound, setNotFound] = useState(false)
 
   useEffect(() => {
-    async function fetchDestination() {
-      try {
-        const decoded = decodeURIComponent(slug)
-        const res = await fetch(`/api/destinations/${decoded}`)      
-        if (res.status === 404) { setNotFound(true); return }
-        if (!res.ok) throw new Error(`API ${res.status}`)
-        const data: Destination = await res.json()
-        setDestination(data)
-      } catch (err) {
-        console.error("Failed to fetch destination:", err)
-        setNotFound(true)
-      } finally {
-        setLoading(false)
+  async function fetchDestination() {
+    try {
+      const decoded = decodeURIComponent(slug)
+      const [res, creatorsRes] = await Promise.all([
+        fetch(`/api/destinations/${decoded}`),
+        fetch(`/api/creators`),
+      ])
+      if (res.status === 404) { setNotFound(true); return }
+      if (!res.ok) throw new Error(`API ${res.status}`)
+      const data: Destination = await res.json()
+
+      // Build creator map and enrich claims
+      if (creatorsRes.ok) {
+        const creatorsData: { channel_id: string; creator_name: string }[] = await creatorsRes.json()
+        const creatorMap: Record<string, string> = {}
+        for (const c of creatorsData) creatorMap[c.channel_id] = c.creator_name
+        data.claims = data.claims.map(claim => ({
+          ...claim,
+          source: creatorMap[claim.source] || claim.source,
+        }))
       }
+
+      setDestination(data)
+    } catch (err) {
+      console.error("Failed to fetch destination:", err)
+      setNotFound(true)
+    } finally {
+      setLoading(false)
     }
-    fetchDestination()
-  }, [slug])
+  }
+  fetchDestination()
+}, [slug])
 
   if (loading) {
     return (

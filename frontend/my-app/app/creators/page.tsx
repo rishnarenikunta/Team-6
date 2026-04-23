@@ -175,7 +175,6 @@ export default function CreatorsPage() {
               {/* STATS SECTION */}
               <div className="mt-4 grid grid-cols-2 gap-3 text-xs text-gray-300">
                 <Stat label="Subscribers" value={formatNumber(creator.subscriber_count)} />
-                <Stat label="Views" value={formatNumber(creator.views)} />
                 {/* <Stat label="Typical CPM" value="$18–$26" /> */}
               </div>
 
@@ -199,9 +198,9 @@ export default function CreatorsPage() {
                           </Link>
                           <div className="flex flex-wrap gap-2 text-[11px] text-gray-400">
                             <span>{video.upload_date || "Date n/a"}</span>
-                            <span className="rounded-full bg-white/10 px-2 py-0.5">
+                            {/* <span className="rounded-full bg-white/10 px-2 py-0.5">
                               {formatNumber(video.view_count)} views
-                            </span>
+                            </span> */}
                             <span className="rounded-full bg-white/10 px-2 py-0.5">
                               {formatNumber(video.like_count)} likes
                             </span>

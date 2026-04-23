@@ -1,7 +1,13 @@
 .env 
 venv 
-
 __pycache__/
 *.pyc
 cookies.txt
 .venv/
+/one
+/Python
+/recreate
+/version
+/with
+/explicit
+/#
