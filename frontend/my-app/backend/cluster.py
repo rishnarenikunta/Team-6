@@ -25,8 +25,7 @@ print("\n=== DIAGNOSTIC ===")
 
 creator_ids = db["creators"].distinct("channel_id")
 narrative_channel_ids = db["narratives"].distinct("channel_id")
-narrative_ids = db["claims"].distinct("narrative_id")
-claim_channel_ids = db["narratives"].distinct("channel_id", {"narrative_id": {"$in": narrative_ids}})
+claim_channel_ids = claim_channel_ids = db["claims"].distinct("source")
 
 print(f"Creators in 'creators' collection: {len(creator_ids)}")
 print(f"Distinct channel_ids in 'narratives': {len(narrative_channel_ids)}")
@@ -295,8 +294,8 @@ def compute_top_narrative(scope_type, scope_filter, type_id, max_clusters=3):
             "typeID":      type_id,
             "clusterRank": 1,
             "narrativeID": None,
-            "channel_id":  None,
-            "video_id":    None,
+            "includedChannels":  [],
+            "includedVideos":    [],
             "clusterSize": 0,
             "totalDocs":   0,
             "averageRiskScore": None,
@@ -318,8 +317,8 @@ def compute_top_narrative(scope_type, scope_filter, type_id, max_clusters=3):
             "clusterRank": 1,
             "narrativeID": fallback_doc.get("narrative_id"),
             "narrative": fallback_doc.get("narrative_title"),
-            "channel_ids":  [fallback_doc.get("channel_id")],
-            "video_ids":    [fallback_doc.get("video_id")],
+            "includedChannels": [fallback_doc.get("channel_id")] if fallback_doc.get("channel_id") else [],
+            "includedVideos": [fallback_doc.get("video_id")] if fallback_doc.get("video_id") else [],
             "clusterSize": 1, "totalDocs": len(docs),
             "averageRiskScore": avg_risk_score,
             "averageRiskLabel": get_risk_label(avg_risk_score),
@@ -387,8 +386,8 @@ def compute_top_claim(scope_type, scope_filter, creator_id, country, max_cluster
             "claimID":     None,
             "claimText":   None,
             "narrativeID": None,
-            "channel_id":  None,
-            "video_id":    None,
+            "includedChannels": [],
+            "includedVideos": [],
             "clusterSize": 0,
             "totalDocs":   0,
             "averageRiskScore": None,
@@ -414,8 +413,8 @@ def compute_top_claim(scope_type, scope_filter, creator_id, country, max_cluster
             "claimID":     fallback_doc.get("_id"),
             "claimText":   fallback_doc.get("claim_title"),
             "narrativeID": fallback_doc.get("narrative_id"),
-            "channel_id":  fallback_doc.get("channel_id"),
-            "video_id":    fallback_doc.get("video_id"),
+            "includedChannels": [fallback_doc.get("channel_id")] if fallback_doc.get("channel_id") else [],
+            "includedVideos": [fallback_doc.get("video_id")] if fallback_doc.get("video_id") else [],
             "clusterSize": 1,
             "totalDocs":   len(docs),
             "averageRiskScore": avg_risk_score,
