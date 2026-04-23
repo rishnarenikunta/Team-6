@@ -102,7 +102,7 @@ export default function CreatorDetailPage() {
             <div className="space-y-3">
               <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-wide text-gray-200">
                 <span className="rounded-full bg-emerald-500/15 text-emerald-200 px-3 py-1">{formatNumber(creator.subscriber_count)} subs</span>
-                <span className="rounded-full bg-white/10 px-3 py-1">{formatNumber(creator.views)} views</span>
+                {/* <span className="rounded-full bg-white/10 px-3 py-1">{formatNumber(creator.views)} views</span> */}
                 <span className="rounded-full bg-white/10 px-3 py-1">{creator.videos.length} videos</span>
                 <span className="rounded-full bg-white/10 px-3 py-1">{creator.trending_claims.length} claims</span>
                 <span className="rounded-full bg-white/10 px-3 py-1">{creator.trending_narratives.length} narratives</span>
@@ -115,7 +115,7 @@ export default function CreatorDetailPage() {
 
         <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <MetricCard label="Subscribers" value={formatNumber(creator.subscriber_count)} />
-          <MetricCard label="Views" value={formatNumber(creator.views)} />
+          {/* <MetricCard label="Views" value={formatNumber(creator.views)} /> */}
           <MetricCard label="Videos" value={`${creator.videos.length}`} />
         </section>
 
@@ -198,9 +198,9 @@ export default function CreatorDetailPage() {
                 </div>
                 <div className="p-4 space-y-2">
                   <p className="text-sm font-semibold text-white line-clamp-2">{video.title}</p>
-                  <p className="text-xs text-gray-300">
+                  {/* <p className="text-xs text-gray-300">
                     {formatNumber(video.view_count)} views · {formatNumber(video.comment_count)} comments · {formatNumber(video.like_count)} likes
-                  </p>
+                  </p> */}
                   <p className="text-[11px] text-gray-400">Uploaded: {video.upload_date || "—"}</p>
                 </div>
               </Link>
