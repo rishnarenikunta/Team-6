@@ -554,7 +554,48 @@ def home():
         "comments_collection": COMMENTS_COLLECTION,
     }
 
+@app.get("/extract-images-only/{video_id}")
+def extract_images_only(video_id: str):
+    """
+    Fetches only the visual assets (Thumbnail & Profile Pic).
+    Does NOT save to MongoDB or GCS.
+    """
+    url = f"https://www.youtube.com/watch?v={video_id}"
+    
+    # Minimal options for speed
+    ydl_opts = {
+        "quiet": True,
+        "skip_download": True,
+        "ignore_no_formats_error": True,
+    }
+    
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+            
+        # The 'thumbnail' key usually points to the highest quality version found
+        video_thumbnail = info.get("thumbnail")
+        
+        # The 'uploader_thumbnail' is the creator's profile picture
+        creator_avatar = info.get("uploader_thumbnail")
+        
+        # If uploader_thumbnail is missing, we can find it in the 'thumbnails' 
+        # array of the uploader/channel metadata if needed.
+        
+        return {
+            "video_id": video_id,
+            "title": info.get("title"),
+            "uploader_name": info.get("uploader"),
+            "images": {
+                "video_thumbnail": video_thumbnail,
+                "creator_profile_picture": creator_avatar
+            },
+            "status": "Extraction successful - No database changes made."
+        }
 
+    except Exception as e:
+        return {"error": str(e)}
+    
 @app.get("/transcript/{video_id}")
 def get_transcript(video_id: str):
     cookies_path = os.getenv("YT_COOKIES_PATH")
@@ -750,3 +791,44 @@ def transcribe_youtube(req: YouTubeRequest):
 
     transcript_path = upload_transcript_to_gcs(req.video_id, text)
     return {"video_id": req.video_id, "gcs_transcript_path": transcript_path, "text": text}
+
+def download_test_images(video_id: str):
+    print(f"--- Starting Test Extraction for {video_id} ---")
+    
+    # 1. Reuse your existing yt-dlp logic
+    url = f"https://www.youtube.com/watch?v={video_id}"
+    ydl_opts = {"quiet": True, "skip_download": True}
+    
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=False)
+        video_thumb_url = info.get("thumbnail")
+        creator_pfp_url = info.get("uploader_thumbnail")
+
+    # 2. Create a local folder for tests
+    test_dir = Path("test_assets")
+    test_dir.mkdir(exist_ok=True)
+
+    # 3. Download Helper
+    def save_img(url, filename):
+        if not url:
+            print(f"Skipping {filename}: URL is empty")
+            return
+        response = requests.get(url, stream=True)
+        if response.status_code == 200:
+            path = test_dir / filename
+            with open(path, 'wb') as f:
+                for chunk in response.iter_content(1024):
+                    f.write(chunk)
+            print(f"Successfully saved: {path}")
+        else:
+            print(f"Failed to download {filename}. Status: {response.status_code}")
+
+    # 4. Execute Downloads
+    save_img(video_thumb_url, f"{video_id}_thumbnail.jpg")
+    save_img(creator_pfp_url, f"{video_id}_creator_pfp.jpg")
+    print("--- Test Complete ---")
+
+if __name__ == "__main__":
+    # REPLACE THIS with any video ID you want to test
+    TEST_VIDEO_ID = "s-m42YoupU0" 
+    download_test_images(TEST_VIDEO_ID)

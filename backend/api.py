@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pymongo import MongoClient
-from typing import Any
+from typing import Any, Optional
 
 load_dotenv()
 
@@ -95,7 +95,7 @@ def get_trending_narratives() -> list[dict[str, Any]]:
     return result
 
 @app.get("/api/destinations")
-def get_destinations(region: str | None = None, tag: str | None = None) -> list[dict[str, Any]]:
+def get_destinations(region: Optional[str]= None, tag: Optional[str]= None) -> list[dict[str, Any]]:
 
     REGIONS: dict[str, list[str]] = {
         "asia":     ["Japan", "South Korea", "Thailand", "Vietnam"],
@@ -141,7 +141,7 @@ def get_destinations(region: str | None = None, tag: str | None = None) -> list[
             results.append({
                 "id":          str(raw["_id"]),
                 "name":        dest,
-                "blurb":       raw.get("narrative_text", ""),
+                "blurb":       raw.get("narrative_title", ""),
                 "top_narrative": None,
                 "cluster_size": None,
                 "computed_at": None,
@@ -159,7 +159,155 @@ def get_destinations(region: str | None = None, tag: str | None = None) -> list[
     return results
 
 
+# ── /api/destinations/{destination_name}/overview ────────────────────────────
+# Destination overview pulling from metadata, claims, narratives, and top_narratives
+# metadata.destinations is an array field — matches if destination_name is in it
 
+@app.get("/api/destinations/{destination_name}/overview")
+def get_destination_overview(destination_name: str) -> dict[str, Any]:
+    def _iso(value: Any) -> Any:
+        if hasattr(value, "isoformat"):
+            return value.isoformat()
+        return value
+
+    # ── 1. Count metadata docs where destinations array contains this destination
+    videos_analyzed = db["metadata"].count_documents(
+        {"destinations": {"$elemMatch": {"$regex": destination_name, "$options": "i"}}}
+    )
+
+    if videos_analyzed == 0:
+        raise HTTPException(status_code=404, detail=f"No data found for destination: {destination_name}")
+
+    # ── 2. Grab one metadata doc to resolve the canonical destination name ─────
+    # (so we return "Kyoto" even if the user passed "kyoto")
+    sample_meta = db["metadata"].find_one(
+        {"destinations": {"$elemMatch": {"$regex": destination_name, "$options": "i"}}},
+        {"_id": 0, "destinations": 1},
+    )
+    # Find the exact matching entry in the destinations array
+    canonical_name = destination_name  # fallback
+    if sample_meta:
+        for d in sample_meta.get("destinations", []):
+            if d.lower() == destination_name.lower():
+                canonical_name = d
+                break
+
+    # ── 3. Count claims for this destination ──────────────────────────────────
+    total_claims = db["claims"].count_documents(
+        {"destination": {"$regex": f"^{canonical_name}$", "$options": "i"}}
+    )
+
+    # ── 4. Count narratives for this destination ──────────────────────────────
+    total_narratives = db["narratives"].count_documents(
+        {"destination": {"$regex": f"^{canonical_name}$", "$options": "i"}}
+    )
+
+    # ── 5. Top narrative from top_narratives (narrative-2 cluster) ────────────
+    # typeID holds the destination name for destination-scoped cluster entries
+    top_narrative_doc = db["top_narratives"].find_one(
+        {
+            "typeID":    {"$regex": f"^{canonical_name}$", "$options": "i"},
+            "type":      "country",
+        },
+        {"_id": 0},
+    )
+
+    top_claim_doc = db["top_claims"].find_one(
+        {
+            "typeID":    {"$regex": f"^{canonical_name}$", "$options": "i"},
+            "type":      "country",
+        },
+        {"_id": 0},
+    )
+
+    top_narrative = None
+    if top_narrative_doc:
+        creators = list(db["creators"].find({}, {"_id": 0}))
+        creator_map = {c.get("channel_id", ""): c for c in creators}
+        top_creator_id = top_narrative_doc.get("channel_id", "")
+        top_narrative = {
+            "narrative":    top_narrative_doc.get("narrative", ""),
+            "narrative_id": top_narrative_doc.get("narrativeID"),
+            "video_id":     top_narrative_doc.get("video_id"),
+            "destination":  canonical_name,
+            "cluster_size": top_narrative_doc.get("clusterSize", 0),
+            "computed_at":  top_narrative_doc["computedAt"].isoformat() if top_narrative_doc.get("computedAt") else None,
+            "total_docs":   top_narrative_doc.get("totalDocs", 0),
+            "source":       top_creator_id,
+            "creator_name": creator_map.get(top_creator_id, {}).get("name", ""),
+        }
+
+    # ── 6. Narratives list for this destination (raw narratives collection) ───
+    narrative_docs = list(
+        db["narratives"]
+        .find(
+            {"destination": {"$regex": f"^{canonical_name}$", "$options": "i"}},
+            {"narrative_vector": 0},
+        )
+        .sort("date", -1)
+        .limit(25)
+    )
+
+    creators = list(db["creators"].find({}, {"_id": 0}))
+    creator_map = {c.get("channel_id", ""): c for c in creators}
+
+    narrative_video_ids = [doc.get("video_id") for doc in narrative_docs if doc.get("video_id")]
+    meta_docs = (
+        list(
+            db["metadata"].find(
+                {"video_id": {"$in": narrative_video_ids}},
+                {"_id": 0, "video_id": 1, "title": 1, "webpage_url": 1, "upload_date": 1, "stats": 1},
+            )
+        )
+        if narrative_video_ids
+        else []
+    )
+    meta_by_video = {m.get("video_id", ""): m for m in meta_docs if m.get("video_id")}
+
+    narratives: list[dict[str, Any]] = []
+    for doc in narrative_docs:
+        video_id = doc.get("video_id", "")
+        channel_id = doc.get("channel_id", "")
+        meta = meta_by_video.get(video_id, {})
+        stats = meta.get("stats", {}) or {}
+
+        narratives.append(
+            {
+                "id": str(doc.get("_id", "")),
+                "narrative_id": doc.get("narrative_id", ""),
+                "text": doc.get("narrative_text") or doc.get("narrative_title") or "",
+                "destination": doc.get("destination", canonical_name),
+                "date": _iso(doc.get("date")),
+                "source": channel_id,
+                "creator_name": creator_map.get(channel_id, {}).get("name", ""),
+                "video": {
+                    "video_id": video_id,
+                    "title": meta.get("title", ""),
+                    "webpage_url": meta.get("webpage_url", ""),
+                    "upload_date": _iso(meta.get("upload_date")),
+                    "view_count": stats.get("view_count"),
+                    "like_count": stats.get("like_count"),
+                    "comment_count": stats.get("comment_count"),
+                },
+            }
+        )
+
+    # ── 6. Assemble response ──────────────────────────────────────────────────
+    return {
+        "destination":       canonical_name,
+        "videos_analyzed":   videos_analyzed,
+        "total_claims":      total_claims,
+        "total_narratives":  total_narratives,
+        "top_narrative":     top_narrative,
+        "narratives":        narratives,
+        "top_claim":        {
+            "claim_text": top_claim_doc.get("claimText", "") if top_claim_doc else None,
+            "cluster_size": top_claim_doc.get("clusterSize", 0) if top_claim_doc else None,
+            "computed_at": top_claim_doc["computedAt"].isoformat() if top_claim_doc and top_claim_doc.get("computedAt") else None,
+            "total_docs": top_claim_doc.get("totalDocs", 0) if top_claim_doc else None,
+        } if top_claim_doc else None,
+
+    }
 # ── /api/creators  ────────────────────────────────────────────────────────────
 # Returns all creators with their top claim narrative from cluster results
 
@@ -167,24 +315,60 @@ def get_destinations(region: str | None = None, tag: str | None = None) -> list[
 def get_creators() -> list[dict[str, Any]]:
     creators = list(db["creators"].find({}, {"_id": 0}))
 
-    top_docs = list(db["top_narratives"].find({
-        "scope_type": "source",
-        "content_type": "claims"
-    }))
-    top_by_creator = {doc["channel_id"]: doc for doc in top_docs}
+    # ── 2. Fetch all metadata and group videos by channel.channel_id ──────────
+    all_meta = list(
+        db["metadata"].find(
+            {},
+            {
+                "_id": 0, 
+                "video_id": 1,
+                "title": 1,
+                "webpage_url": 1,
+                "channel": 1,
+                "stats": 1,
+                "upload_date": 1,
+                },
+        )
+    )
 
+    videos_by_channel: dict[str, list] = {}
+    for m in all_meta:
+        channel_id = m.get("channel", {}).get("channel_id", "")
+        if not channel_id:
+            continue
+        videos_by_channel.setdefault(channel_id, []).append(m)
+
+    # ── 3. Assemble results ───────────────────────────────────────────────────
     results = []
     for creator in creators:
-        cid = creator["channel_id"]
-        top = top_by_creator.get(cid)
+        cid    = creator.get("channel_id", "")
+        videos = videos_by_channel.get(cid, [])
+
+        video_list = [
+            {
+                "video_id":      v.get("video_id", ""),
+                "title":         v.get("title", ""),
+                "view_count":    v.get("stats", {}).get("view_count"),
+                "like_count":    v.get("stats", {}).get("like_count"),
+                "comment_count": v.get("stats", {}).get("comment_count"),
+                "webpage_url":   v.get("webpage_url", ""),
+                "upload_date":   v.get("upload_date", ""),
+            }
+            for v in videos
+        ]
+
+        comment_volume = sum(
+            v.get("stats", {}).get("comment_count", 0) or 0
+            for v in videos
+        )
+
         results.append({
-            "channel_id":      cid,
-            "name":            creator.get("name", ""),
+            "channel_id":       cid,
+            "creator_name":     creator.get("name", ""),
             "subscriber_count": creator.get("subscriber_count", 0),
-            "views":           creator.get("views", 0),
-            "top_claim":       top.get("top_narrative") if top else None,
-            "cluster_size":    top.get("cluster_size") if top else None,
-            "computed_at":     top["computed_at"].isoformat() if top and top.get("computed_at") else None,
+            "views":            creator.get("views", 0),
+            "comment_volume":   comment_volume,
+            "videos":           video_list,
         })
 
     return results
@@ -194,33 +378,96 @@ def get_creators() -> list[dict[str, Any]]:
 
 @app.get("/api/creators/{channel_id}")
 def get_creator(channel_id: str) -> dict[str, Any]:
+
+    # ── 1. Fetch the creator ──────────────────────────────────────────────────
     creator = db["creators"].find_one({"channel_id": channel_id}, {"_id": 0})
     if not creator:
         raise HTTPException(status_code=404, detail="Creator not found")
 
-    top = db["top_narratives"].find_one({
-        "channel_id": channel_id,
-        "scope_type": "source",
-        "content_type": "claims"
-    })
-
-    claims = list(
-        db["claims"].find(
-            {"source": channel_id},
-            {"_id": 0, "claim_text": 1, "destination": 1, "claim_risk": 1, "date": 1}
+    # ── 2. Fetch all metadata for this creator (join on channel.channel_id) ───
+    meta_docs = list(
+        db["metadata"].find(
+            {"channel.channel_id": channel_id},
+            {
+                "_id": 0,
+                "video_id": 1,
+                "title": 1,
+                "webpage_url": 1,
+                "stats": 1,
+                "upload_date": 1,
+            },
         )
     )
 
+    video_list = [
+        {
+            "video_id":      v.get("video_id", ""),
+            "title":         v.get("title", ""),
+            "view_count":    v.get("stats", {}).get("view_count"),
+            "like_count":    v.get("stats", {}).get("like_count"),
+            "comment_count": v.get("stats", {}).get("comment_count"),
+            "webpage_url":   v.get("webpage_url", ""),
+            "upload_date":   v.get("upload_date", ""),
+        }
+        for v in meta_docs
+    ]
+
+    comment_volume = sum(
+        v.get("stats", {}).get("comment_count", 0) or 0
+        for v in meta_docs
+    )
+
+    # ── 3. Fetch trending narratives from top_narratives ──────────────────────
+    # join on typeID = channel_id and type = "creator"
+    narrative_docs = list(
+        db["top_narratives"].find(
+            {"typeID": channel_id, "type": "creator"},
+            {"_id": 0},
+        )
+    )
+
+    trending_narratives = [
+        {
+            "narrative_id":  doc.get("narrativeID"),
+            "narrative":     doc.get("narrative"),
+            "cluster_size":  doc.get("clusterSize"),
+            "video_id":      doc.get("video_id"),
+            "computed_at":   doc["computedAt"].isoformat() if doc.get("computedAt") else None,
+            "total_docs":    doc.get("totalDocs", 0),
+        }
+        for doc in narrative_docs
+    ]
+
+    # ── 4. Fetch trending claims from top_claims ───────────────────────────────
+    # join on typeID = channel_id and type = "creator"
+    claim_docs = list(
+        db["top_claims"].find(
+            {"typeID": channel_id, "type": "creator"},
+            {"_id": 0},
+        )
+    )
+
+    trending_claims = [
+        {
+        "claim_id":    str(doc["claimID"]) if doc.get("claimID") else None,  # ✅
+        "claim_text":  doc.get("claimText"),
+        "cluster_size": doc.get("clusterSize"),
+        "computed_at": doc["computedAt"].isoformat() if doc.get("computedAt") else None,
+        "total_docs":  doc.get("totalDocs", 0),
+    }
+    for doc in claim_docs
+    ]
+
+    # ── 5. Assemble response ──────────────────────────────────────────────────
     return {
-        "channel_id":       channel_id,
-        "name":             creator.get("name", ""),
-        "subscriber_count": creator.get("subscriber_count", 0),
-        "views":            creator.get("views", 0),
-        "join_date":        creator["join_date"].isoformat() if creator.get("join_date") else None,
-        "top_claim":        top.get("top_narrative") if top else None,
-        "cluster_size":     top.get("cluster_size") if top else None,
-        "computed_at":      top["computed_at"].isoformat() if top and top.get("computed_at") else None,
-        "claims":           claims,
+        "channel_id":        channel_id,
+        "creator_name":      creator.get("name", ""),
+        "subscriber_count":  creator.get("subscriber_count", 0),
+        "views":             creator.get("views", 0),
+        "comment_volume":    comment_volume,
+        "videos":            video_list,
+        "trending_narratives": trending_narratives,
+        "trending_claims":     trending_claims,
     }
 
 
@@ -229,9 +476,6 @@ print("Total claims:",     db["claims"].count_documents({}))
 print("Top narratives computed:", db["top_narratives"].count_documents({}))
 print("Top claims computed:", db["top_claims"].count_documents({}))
 
-# ─────────────────────────────────────────────────────────────────────────────
-# NEW ENDPOINTS — paste these into api.py
-# ─────────────────────────────────────────────────────────────────────────────
 
 from math import floor
 
@@ -312,6 +556,25 @@ def get_main_stats() -> dict[str, Any]:
         "creator_insights":     creator_insights,
     }
 
+# ── /api/creators/{channel_id}/pfp ───────────────────────────────────────────
+# Returns the stored profile picture URL for a creator
+
+@app.get("/api/creators/{channel_id}/pfp")
+def get_creator_pfp(channel_id: str) -> dict[str, Any]:
+    creator = db["creators"].find_one(
+        {"channel_id": channel_id},
+        {"_id": 0, "channel_id": 1, "name": 1, "pfp_url": 1},
+    )
+    if not creator:
+        raise HTTPException(status_code=404, detail="Creator not found")
+    if not creator.get("pfp_url"):
+        raise HTTPException(status_code=404, detail="No profile picture found for this creator. Run the enrichment script first.")
+
+    return {
+        "channel_id": creator["channel_id"],
+        "creator_name": creator.get("name", ""),
+        "pfp_url": creator["pfp_url"],
+    }
 
 # ── /api/narratives ──────────────────────────────────────────────────────────
 # Powers /narratives/page.tsx  — paginated list of all narratives
@@ -319,7 +582,7 @@ def get_main_stats() -> dict[str, Any]:
 
 @app.get("/api/narratives")
 def list_narratives(
-    destination: str | None = None,
+    destination: Optional[str] = None,
     limit: int = 20,
     offset: int = 0,
 ) -> dict[str, Any]:
@@ -345,7 +608,7 @@ def list_narratives(
         {
             "id":           str(doc["_id"]),
             "narrative_id": doc.get("narrative_id", ""),
-            "text":         doc.get("narrative_text", ""),
+            "text":         doc.get("narrative_title", ""),
             "destination":  doc.get("destination", ""),
             "date":         doc["date"].isoformat() if doc.get("date") else None,
             "channel_id":   doc.get("channel_id", ""),
@@ -358,6 +621,303 @@ def list_narratives(
 
     return {"total": total, "offset": offset, "limit": limit, "items": items}
 
+# ── /api/narratives/enriched ─────────────────────────────────────────────────
+# Returns all narratives enriched with:
+#   - claims joined on narrative_id
+#   - metadata tags + sentiment label
+#   - slug field (= narrative_id)
+
+@app.get("/api/narratives/enriched")
+def get_narratives_enriched() -> list[dict[str, Any]]:
+
+    # ── 1. Fetch all narratives ───────────────────────────────────────────────
+    narratives = list(db["narratives"].find({}, {"narrative_vector": 0}))
+
+    # ── 2. Build claims lookup keyed by narrative_id ──────────────────────────
+    all_claims = list(
+        db["claims"].find(
+            {},
+            {"_id": 0, "narrative_id": 1, "claim_title": 1, "claim_risk": 1, "source": 1, "date": 1},
+        )
+    )
+    claims_by_narrative: dict[str, list] = {}
+    for claim in all_claims:
+        nid = claim.get("narrative_id", "")
+        claims_by_narrative.setdefault(nid, []).append({
+            "claim_text": claim.get("claim_title", ""),
+            "claim_risk": claim.get("claim_risk", ""),
+            "source":     claim.get("source", ""),
+            "date":       claim.get("date", ""),
+        })
+
+    # ── 3. Build metadata lookup keyed by video_id ────────────────────────────
+    all_meta = list(
+        db["metadata"].find(
+            {},
+            {"_id": 0, "video_id": 1, "tags": 1, "sentiment": 1, "title": 1, "upload_date": 1, "webpage_url": 1},
+        )
+    )
+    meta_by_video: dict[str, dict] = {m["video_id"]: m for m in all_meta if m.get("video_id")}
+
+    # ── 4. Assemble enriched records ──────────────────────────────────────────
+    results = []
+    for doc in narratives:
+        narrative_id = doc.get("narrative_id", "")
+        video_id     = doc.get("video_id", "")
+        meta         = meta_by_video.get(video_id, {})
+
+        raw_sentiment = meta.get("sentiment")
+        if raw_sentiment is None:
+            sentiment_label = None
+        elif raw_sentiment >= 0.66:
+            sentiment_label = "positive"
+        elif raw_sentiment <= 0.33:
+            sentiment_label = "negative"
+        else:
+            sentiment_label = "neutral"
+
+        results.append({
+            "slug":           narrative_id,          # <── slug as a field
+            "narrative_id":   narrative_id,
+            "video_id":       video_id,
+            "destination":    doc.get("destination", ""),
+            "channel_id":     doc.get("channel_id", ""),
+            "narrative_text": doc.get("narrative_title", ""),
+            "date":           doc["date"].isoformat() if doc.get("date") else None,
+            "claims":         claims_by_narrative.get(narrative_id, []),
+            "metadata": {
+                "tags":            meta.get("tags", []),
+                "sentiment_score": raw_sentiment,
+                "sentiment":       sentiment_label,
+                "title":           meta.get("title", ""),
+                "upload_date":     meta.get("upload_date", ""),
+                "webpage_url":     meta.get("webpage_url", ""),
+            },
+        })
+
+    return results
+
+
+# ── /api/narratives/enriched/full ────────────────────────────────────────────
+# All narratives enriched with claims, metadata, and video stats
+
+@app.get("/api/narratives/enriched/video_details")
+def get_narratives_enriched_videoDetails() -> list[dict[str, Any]]:
+
+    # ── 1. Fetch all narratives ───────────────────────────────────────────────
+    narratives = list(db["narratives"].find({}, {"narrative_vector": 0}))
+
+    # ── 2. Build claims lookup keyed by narrative_id ──────────────────────────
+    all_claims = list(
+        db["claims"].find(
+            {},
+            {"_id": 0, "narrative_id": 1, "claim_title": 1, "claim_risk": 1, "source": 1, "date": 1},
+        )
+    )
+   
+    claims_by_narrative: dict[str, list] = {}
+    for claim in all_claims:
+        nid = claim.get("narrative_id", "")
+        claims_by_narrative.setdefault(nid, []).append({
+            "claim_text": claim.get("claim_title", ""),
+            "claim_risk": claim.get("claim_risk", ""),
+            "source":     claim.get("source", ""),
+            "date":       claim.get("date", ""),
+        })
+
+    # ── 3. Build metadata lookup keyed by video_id ────────────────────────────
+    all_meta = list(
+        db["metadata"].find(
+            {},
+            {
+                "_id": 0,
+                "video_id": 1,
+                "tags": 1,
+                "sentiment": 1,
+                "title": 1,
+                "upload_date": 1,
+                "webpage_url": 1,
+                "risk_callouts": 1,
+                "stats": 1,
+                "thumbnail_url": 1, 
+            },
+        )
+    )
+    meta_by_video: dict[str, dict] = {m["video_id"]: m for m in all_meta if m.get("video_id")}
+
+    all_creators = list(
+    db["creators"].find(
+        {},
+        {
+            "_id": 0,
+            "channel_id": 1,
+            "pfp_url": 1,
+            "name": 1,
+        },
+    )
+    )
+
+    creators_by_channel: dict[str, dict] = {
+        c["channel_id"]: c for c in all_creators if c.get("channel_id")
+    }
+
+    # ── 4. Shared helper: sentiment label ─────────────────────────────────────
+    def sentiment_label(score) -> Optional[str]:
+        if score is None:
+            return None
+        if score >= 0.66:
+            return "positive"
+        if score <= 0.33:
+            return "negative"
+        return "neutral"
+
+    # ── 5. Shared helper: risk_callouts — filter out "None" placeholders ──────
+    def parse_risk_callouts(raw: list) -> list[str]:
+        return [r for r in (raw or []) if r and r.strip().lower() != "none"]
+
+    # ── 6. Assemble enriched records ──────────────────────────────────────────
+    results = []
+    for doc in narratives:
+         #find creator assicated with each narrative for joining in the frontend
+        creator = creators_by_channel.get(doc.get("channel_id", ""), {})
+        narrative_id  = doc.get("narrative_id", "")
+        video_id      = doc.get("video_id", "")
+        meta          = meta_by_video.get(video_id, {})
+        stats         = meta.get("stats", {})
+        raw_sentiment = meta.get("sentiment")
+
+        results.append({
+            "slug":           narrative_id,
+            "narrative_id":   narrative_id,
+            "video_id":       video_id,
+            "destination":    doc.get("destination", ""),
+            "channel_id":     doc.get("channel_id", ""),
+            "narrative_text": doc.get("narrative_title", ""),
+            "creator_pfp":   creator.get("pfp_url", ""),
+            "channel_name": creator.get("name", ""),
+            "date":           doc["date"].isoformat() if doc.get("date") else None,
+            "claims":         claims_by_narrative.get(narrative_id, []),
+            "metadata": {
+                "tags":            meta.get("tags", []),
+                "sentiment_score": raw_sentiment,
+                "sentiment":       sentiment_label(raw_sentiment),
+                "title":           meta.get("title", ""),
+                "upload_date":     meta.get("upload_date", ""),
+                "thumbnail_url":   meta.get("thumbnail_url", ""),
+                "webpage_url":     meta.get("webpage_url", ""),
+                "risk_callouts":   parse_risk_callouts(meta.get("risk_callouts", [])),
+            },
+            "video_stats": {
+                "view_count":    stats.get("view_count"),
+                "like_count":    stats.get("like_count"),
+                "comment_count": stats.get("comment_count"),
+            },
+        })
+
+    return results
+
+
+# ── /api/narratives/enriched/full/{narrative_id} ─────────────────────────────
+# Same shape as above but for a single narrative
+
+@app.get("/api/narratives/enriched/video_details/{narrative_id}")
+def get_narrative_enriched_videoDetails(narrative_id: str) -> dict[str, Any]:
+
+    # ── 1. Fetch the narrative ────────────────────────────────────────────────
+    doc = db["narratives"].find_one(
+        {"narrative_id": narrative_id},
+        {"narrative_vector": 0},
+    )
+    if not doc:
+        raise HTTPException(status_code=404, detail="Narrative not found")
+
+    video_id = doc.get("video_id", "")
+
+    # ── 2. Fetch claims joined on narrative_id ────────────────────────────────
+    claims = [
+        {
+            "claim_text": c.get("claim_title", ""),
+            "claim_risk": c.get("claim_risk", ""),
+            "source":     c.get("source", ""),
+            "date":       c.get("date", ""),
+        }
+        for c in db["claims"].find(
+            {"narrative_id": narrative_id},
+            {"_id": 0, "claim_title": 1, "claim_risk": 1, "source": 1, "date": 1},
+        )
+    ]
+
+    # ── 3. Fetch metadata by video_id ─────────────────────────────────────────
+    meta = db["metadata"].find_one(
+        {"video_id": video_id},
+        {
+            "_id": 0,
+            "tags": 1,
+            "sentiment": 1,
+            "title": 1,
+            "upload_date": 1,
+            "webpage_url": 1,
+            "risk_callouts": 1,
+            "stats": 1,
+            "thumbnail_url": 1,
+        },
+    ) or {}
+
+    stats = meta.get("stats", {})
+
+    creator = db["creators"].find_one(
+    {"channel_id": doc.get("channel_id", "")},
+    {"_id": 0, "pfp_url": 1, "name": 1},
+    
+) or {}
+
+    # ── 4. Sentiment label ────────────────────────────────────────────────────
+    raw_sentiment = meta.get("sentiment")
+    if raw_sentiment is None:
+        sentiment = None
+    elif raw_sentiment >= 0.66:
+        sentiment = "positive"
+    elif raw_sentiment <= 0.33:
+        sentiment = "negative"
+    else:
+        sentiment = "neutral"
+
+    # ── 5. Risk callouts — strip "None" placeholders ──────────────────────────
+    risk_callouts = [
+        r for r in meta.get("risk_callouts", [])
+        if r and r.strip().lower() != "none"
+    ]
+
+    return {
+        "slug":           narrative_id,
+        "narrative_id":   narrative_id,
+        "video_id":       video_id,
+        "creator_pfp":   creator.get("pfp_url", ""),
+        "channel_name": creator.get("name", ""),
+        "destination":    doc.get("destination", ""),
+        "channel_id":     doc.get("channel_id", ""),
+        "narrative_text": doc.get("narrative_title", ""),
+        "date":           doc["date"].isoformat() if doc.get("date") else None,
+        "claims":         claims,
+        "metadata": {
+            "tags":            meta.get("tags", []),
+            "sentiment_score": raw_sentiment,
+            "sentiment":       sentiment,
+            "title":           meta.get("title", ""),
+            "upload_date":     meta.get("upload_date", ""),
+            "thumbnail_url":   meta.get("thumbnail_url", ""),
+            "webpage_url":     meta.get("webpage_url", ""),
+            "risk_callouts":   risk_callouts,
+        },
+        "video_stats": {
+            "view_count":    stats.get("view_count"),
+            "like_count":    stats.get("like_count"),
+            "comment_count": stats.get("comment_count"),
+        },
+    }
+
+
+
 
 # ── /api/narratives/{slug} ───────────────────────────────────────────────────
 # Powers /narratives/[slug]/page.tsx — single narrative detail
@@ -365,7 +925,6 @@ def list_narratives(
 @app.get("/api/narratives/{slug}")
 def get_narrative_detail(slug: str) -> dict[str, Any]:
 
-    # slug = narrative_id value (e.g. "narr_kyoto_01")
     doc = db["narratives"].find_one(
         {"narrative_id": slug},
         {"narrative_vector": 0},
@@ -378,26 +937,30 @@ def get_narrative_detail(slug: str) -> dict[str, Any]:
 
     creator = db["creators"].find_one({"channel_id": channel_id}, {"_id": 0}) or {}
 
-    # Related claims for the same destination
+    # ── Fetch video metadata using video_id from the narrative ────────────────
+    video_id = doc.get("video_id", "")
+    meta = db["metadata"].find_one(
+        {"video_id": video_id},
+        {"_id": 0, "webpage_url": 1, "views": 1, "upload_date": 1, "channel_url": 1}
+    ) or {}
+
     related_claims = list(
         db["claims"].find(
             {"destination": destination},
-            {"_id": 0, "claim_text": 1, "source": 1, "claim_risk": 1, "date": 1},
+            {"_id": 0, "claim_title": 1, "source": 1, "claim_risk": 1, "date": 1},
         ).limit(10)
     )
 
-    # Top cluster result for this destination (if available)
     cluster = db["top_narratives"].find_one({
         "destination_id": destination,
         "scope_type": "destination",
         "content_type": "narratives",
     })
 
-    # Other narratives for same destination (siblings)
     siblings = list(
         db["narratives"].find(
             {"destination": destination, "narrative_id": {"$ne": slug}},
-            {"narrative_vector": 0, "_id": 0, "narrative_id": 1, "narrative_text": 1},
+            {"narrative_id": 1, "narrative_title": 1},
         ).limit(5)
     )
 
@@ -405,7 +968,7 @@ def get_narrative_detail(slug: str) -> dict[str, Any]:
         "id":             str(doc["_id"]),
         "narrative_id":   doc.get("narrative_id", ""),
         "slug":           slug,
-        "text":           doc.get("narrative_text", ""),
+        "text":           doc.get("narrative_title", ""),
         "destination":    destination,
         "date":           doc["date"].isoformat() if doc.get("date") else None,
         "channel_id":     channel_id,
@@ -416,9 +979,15 @@ def get_narrative_detail(slug: str) -> dict[str, Any]:
         "top_narrative":  cluster.get("narrative") if cluster else None,
         "related_claims": related_claims,
         "related_narratives": [
-            {"slug": s["narrative_id"], "text": s["narrative_text"]}
+            {"slug": s["narrative_id"], "text": s["narrative_title"]}
             for s in siblings
         ],
+        # ── video fields from metadata collection ─────────────────────────────
+        "video_id":        video_id,
+        "video_url":       meta.get("webpage_url", ""),
+        "video_views":     meta.get("views", 0),
+        "video_published": meta.get("upload_date", ""),   # keep as-is (likely already a string like "20240101")
+        "video_channel":   meta.get("channel_url", ""),
     }
 
 
@@ -534,7 +1103,7 @@ def get_destination(destination_name: str) -> dict[str, Any]:
         if not raw:
             raise HTTPException(status_code=404, detail="Destination not found")
         dest_name = raw["destination"]
-        blurb = raw.get("narrative_text", "")
+        blurb = raw.get("narrative_title", "")
         cluster_size = None
         computed_at = None
         doc_id = str(raw["_id"])
@@ -549,7 +1118,7 @@ def get_destination(destination_name: str) -> dict[str, Any]:
     claims = list(
         db["claims"].find(
             {"destination": dest_name},
-            {"_id": 0, "claim_text": 1, "source": 1, "claim_risk": 1, "date": 1}
+            {"_id": 0, "claim_title": 1, "source": 1, "claim_risk": 1, "date": 1}
         )
     )
 
@@ -569,4 +1138,3 @@ def get_destination(destination_name: str) -> dict[str, Any]:
         "top_claim":     top_claim.get("top_narrative") if top_claim else None,
         "claims":        claims,
     }
-

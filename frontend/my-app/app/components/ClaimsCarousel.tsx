@@ -13,12 +13,10 @@ interface Claim {
   computed_at: string | null;
   source: string;        // channel_id
   creator_name: string;
-  views: number;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 export default function ClaimsCarousel() {
   const carouselRef = useRef<HTMLDivElement>(null);
@@ -27,21 +25,41 @@ export default function ClaimsCarousel() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    async function fetchClaims() {
-      try {
-        const res = await fetch(`${API_BASE}/api/claims/trending`);
-        if (!res.ok) throw new Error(`API error ${res.status}`);
-        const data = await res.json();
-        setClaims(data);
-      } catch (err) {
-        console.error("Fetch error:", err);
-        setError("Could not load claims.");
-      } finally {
-        setLoading(false);
+  async function fetchClaims() {
+    try {
+      const [claimsRes, creatorsRes] = await Promise.all([
+        fetch(`/api/claims/trending`),
+        fetch(`/api/creators`),
+      ]);
+
+      if (!claimsRes.ok) throw new Error(`API error ${claimsRes.status}`);
+      if (!creatorsRes.ok) throw new Error(`API error ${creatorsRes.status}`);
+
+      const data = await claimsRes.json();
+      const creatorsData: { channel_id: string; creator_name: string }[] = await creatorsRes.json();
+
+      // Build lookup map
+      const creatorMap: Record<string, string> = {};
+      for (const c of creatorsData) {
+        creatorMap[c.channel_id] = c.creator_name;
       }
+
+      // Enrich claims with creator names
+      const enriched = data.map((claim: Claim) => ({
+        ...claim,
+        creator_name: creatorMap[claim.source] || claim.creator_name || "Unknown creator",
+      }));
+
+      setClaims(enriched);
+    } catch (err) {
+      console.error("Fetch error:", err);
+      setError("Could not load claims.");
+    } finally {
+      setLoading(false);
     }
-    fetchClaims();
-  }, []);
+  }
+  fetchClaims();
+}, []);
 
   // only display claims with a destination and text and only the top 10 or min(claims.length, 10 
   const filteredClaims = claims.filter(claim => claim.destination && claim.text);
@@ -106,7 +124,7 @@ export default function ClaimsCarousel() {
             </p>
             <div className="mt-3 space-y-1 text-sm text-gray-400">
               <p className="font-medium text-gray-200">
-                {claim.creator_name || "Unknown creator"} · {claim.views.toLocaleString()} views
+                {claim.creator_name || "Unknown creator"}
               </p>
               <p className="text-gray-400">
                 Based on {claim.cluster_size} similar claims

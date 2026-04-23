@@ -19,17 +19,17 @@ const linkGroups: LinkGroup[] = [
     links: [
       { label: "About", href: "/about" },
       { label: "Contact", href: "/contact" },
-      { label: "Changelog", href: "/changelog" },
+      // { label: "Changelog", href: "/changelog" },
     ],
   },
-  {
-    title: "Support",
-    links: [
-      { label: "Docs", href: "/docs" },
-      { label: "Status", href: "/status" },
-      { label: "Security", href: "/security" },
-    ],
-  },
+  // {
+  //   title: "Support",
+  //   links: [
+  //     { label: "Docs", href: "/docs" },
+  //     { label: "Status", href: "/status" },
+  //     { label: "Security", href: "/security" },
+  //   ],
+  // },
 ]
 
 export default function Footer() {
@@ -91,8 +91,8 @@ export default function Footer() {
               Terms
             </Link>
             <span className="text-gray-600">/</span>
-            <Link href="mailto:hello@youtravel.ai" className="hover:text-white transition-colors">
-              hello@youtravel.ai
+            <Link href="mailto:rishna.renikunta@gmail.com" className="hover:text-white transition-colors">
+              rishna.renikunta@gmail.com
             </Link>
           </div>
         </div>

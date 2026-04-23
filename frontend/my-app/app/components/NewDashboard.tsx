@@ -17,7 +17,6 @@ export default function NewDashboard() {
     const [matches, setMatches] = useState<any[]>([])
     const [searching, setSearching] = useState(false)
     const [error, setError] = useState<string | null>(null)
-    const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
     const router = useRouter()
 
     useEffect(() => {
@@ -31,7 +30,7 @@ export default function NewDashboard() {
         try {
           setSearching(true)
           setError(null)
-          const res = await fetch(`${API_BASE}/api/destinations/${encodeURIComponent(searchTerm)}`)
+          const res = await fetch(`/api/destinations/${encodeURIComponent(searchTerm)}`)
           if (!res.ok) throw new Error(`API ${res.status}`)
           const data = await res.json()
           // normalize to array
@@ -45,7 +44,7 @@ export default function NewDashboard() {
       }, 300)
 
       return () => clearTimeout(id)
-    }, [API_BASE, searchTerm])
+    }, [searchTerm])
 
   
 

@@ -11,10 +11,7 @@ interface Narrative {
   computed_at: string | null;
   source: string;
   creator_name: string;
-  views: number;
 }
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 export default function TrendingNarratives() {
   const [narratives, setNarratives] = useState<Narrative[]>([]);
@@ -23,7 +20,7 @@ export default function TrendingNarratives() {
   useEffect(() => {
     async function fetchNarratives() {
       try {
-        const res = await fetch(`${API_BASE}/api/narratives/trending`);
+        const res = await fetch(`/api/narratives/trending`);
         if (!res.ok) throw new Error(`API error ${res.status}`);
         const data: Narrative[] = await res.json();
         setNarratives(data);
@@ -95,10 +92,6 @@ export default function TrendingNarratives() {
                   <div className="text-sm">Similar Narratives</div>
                 </div>
 
-                <div>
-                  <div className="text-3xl font-bold">{selected.views.toLocaleString()}</div>
-                  <div className="text-sm">Views</div>
-                </div>
 
                 <div>
                   <div className="text-3xl font-bold truncate">{selected.creator_name || selected.source}</div>
