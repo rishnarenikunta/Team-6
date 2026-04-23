@@ -1,3 +1,4 @@
+import math
 import os
 import re
 import html
@@ -17,7 +18,7 @@ from dotenv import load_dotenv
 from pymongo import MongoClient, UpdateOne
 from google.cloud import storage
 from openai import OpenAI
-import requests
+from datetime import datetime, timezone
 
 load_dotenv(dotenv_path=Path(__file__).with_name(".env"))
 
@@ -75,9 +76,10 @@ CHANNEL_BUCKETS: dict[str, list[str]] = {
 NON_TRAVEL_BUCKETS = {"Food", "Lifestyle/Vlog", "Tech", "Entertainment", "News", "Wellness"}
 
 DEFAULT_WEIGHTS = {
-    "views": 0.34,
-    "likes": 0.33,
-    "comments": 0.33,
+    "views": 0.25,
+    "likes": 0.25,
+    "comments": 0.25,
+    "recency": 0.25
 }
 
 COMMON_YTDLP_OPTS = {
@@ -443,7 +445,7 @@ def fetch_comments(video_id: str, n: int = 10, timeout_sec: int = 600):
     url = f"https://www.youtube.com/watch?v={video_id}"
     cookies = os.getenv("YT_COOKIES_PATH")
     cmd = [
-        "yt-dlp",
+        "/opt/anaconda3/bin/yt-dlp",
         "--ignore-config",
         "--skip-download",
         "--get-comments",
@@ -512,6 +514,24 @@ def fetch_video_info(video_id: str) -> dict:
         "channel_url": info.get("channel_url"),
     }
 
+def recency_boost(upload_date: Optional[str], half_life_days: int = 180) -> float:
+    """
+    Returns a value between about 0 and 1.
+    Newer videos are closer to 1.
+    Older videos decay gradually.
+    """
+    if not upload_date:
+        return 0.0
+
+    try:
+        published = datetime.strptime(upload_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        now = datetime.now(timezone.utc)
+        age_days = max((now - published).days, 0)
+
+        # exponential decay
+        return 0.5 ** (age_days / half_life_days)
+    except Exception:
+        return 0.0
 
 # ---------------------------------------------------------------------------
 # Endpoints
@@ -644,6 +664,7 @@ def top_20_videos_by_bucket_store(
     w_views: float = DEFAULT_WEIGHTS["views"],
     w_likes: float = DEFAULT_WEIGHTS["likes"],
     w_comments: float = DEFAULT_WEIGHTS["comments"],
+    w_recency: float = DEFAULT_WEIGHTS["recency"],
 ):
     if (w_views + w_likes + w_comments) <= 0:
         raise HTTPException(status_code=400, detail="Weights must sum to > 0")
@@ -680,7 +701,18 @@ def top_20_videos_by_bucket_store(
                 views = safe_int(info.get("view_count"))
                 likes = safe_int(info.get("like_count"))
                 comments_count = safe_int(info.get("comment_count"))
-                score = (w_views * views) + (w_likes * likes) + (w_comments * comments_count)
+
+                views_score = math.log1p(views)
+                likes_score = math.log1p(likes)
+                comments_score = math.log1p(comments_count)
+                freshness = recency_boost(info.get("upload_date"))
+
+                score = (
+                    (w_views * views_score) +
+                    (w_likes * likes_score) +
+                    (w_comments * comments_score) + 
+                    (w_recency * freshness)
+                )
 
                 scored.append({
                     "video_id": info.get("video_id"),
@@ -736,7 +768,7 @@ def top_20_videos_by_bucket_store(
 
             results[bucket].append({
                 "channel_url": channel_url,
-                "weights": {"views": w_views, "likes": w_likes, "comments": w_comments},
+                "weights": {"views": w_views, "likes": w_likes, "comments": w_comments, "recency": w_recency},
                 "top_20": stored,
             })
 

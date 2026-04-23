@@ -3,11 +3,7 @@ venv
 __pycache__/
 *.pyc
 cookies.txt
-.venv/
-/one
-/Python
-/recreate
-/version
-/with
-/explicit
-/#
+
+*.log
+*.json
+application_default_credentials.json
