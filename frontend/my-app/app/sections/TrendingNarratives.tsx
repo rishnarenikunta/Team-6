@@ -1,15 +1,24 @@
+// app/sections/TrendingNarratives.tsx
 "use client";
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
-interface Narrative {
+interface RawTrendingNarrative {
   id: string;
   text: string;
   destination: string;
   cluster_size: number;
   computed_at: string | null;
   source: string;
+}
+
+interface Creator {
+  channel_id: string;
+  creator_name: string;
+}
+
+interface Narrative extends RawTrendingNarrative {
   creator_name: string;
 }
 
@@ -20,23 +29,49 @@ export default function TrendingNarratives() {
   useEffect(() => {
     async function fetchNarratives() {
       try {
-        const res = await fetch(`/api/narratives/trending`);
-        if (!res.ok) throw new Error(`API error ${res.status}`);
-        const data: Narrative[] = await res.json();
-        setNarratives(data);
-        setSelected(data[0] ?? null);
-        console.log("Number of trending topics:", data.length)
+        const [narrativesRes, creatorsRes] = await Promise.all([
+          fetch("/api/narratives/trending"),
+          fetch("/api/creators"),
+        ]);
+
+        if (!narrativesRes.ok) throw new Error(`API error ${narrativesRes.status}`);
+        if (!creatorsRes.ok) throw new Error(`API error ${creatorsRes.status}`);
+
+        const raw: RawTrendingNarrative[] = await narrativesRes.json();
+        const creators: Creator[] = await creatorsRes.json();
+
+        console.log("Raw trending narratives sample:", raw[0]);
+        console.log("Creators sample:", creators[0]);
+
+        const creatorMap: Record<string, string> = {};
+        for (const c of creators) {
+          creatorMap[c.channel_id] = c.creator_name;
+        }
+
+        const enriched: Narrative[] = raw.map((item) => ({
+          ...item,
+          creator_name:
+            creatorMap[item.source] ??
+            creatorMap[item.destination] ??
+            "—",
+        }));
+
+        setNarratives(enriched);
+        setSelected(enriched[0] ?? null);
+        console.log("Number of trending topics:", enriched.length);
       } catch (err) {
         console.error("Failed to fetch narratives:", err);
       }
     }
+
     fetchNarratives();
   }, []);
 
-  // only display narratives with a destination and text and only the top 10 or min(narratives.length, 10 and unique text
-  const filteredNarratives = narratives.filter(narrative => narrative.destination && narrative.text);
+  const filteredNarratives = narratives.filter(
+    (narrative) => narrative.destination && narrative.text
+  );
   const uniqueNarrativesMap = new Map<string, Narrative>();
-  filteredNarratives.forEach(narrative => {
+  filteredNarratives.forEach((narrative) => {
     if (!uniqueNarrativesMap.has(narrative.text)) {
       uniqueNarrativesMap.set(narrative.text, narrative);
     }
@@ -44,15 +79,20 @@ export default function TrendingNarratives() {
   const uniqueNarratives = Array.from(uniqueNarrativesMap.values());
   const displayedNarratives = uniqueNarratives.slice(0, 6);
 
+  function secondaryLabel(n: Narrative): string {
+  return n.creator_name !== "—" ? n.creator_name : n.destination || "—";
+}
 
   return (
     <div className="w-full mt-10 h-fit mb-50">
       <h2 className="text-2xl font-semibold text-white tracking-tight mb-2">
         Trending Narratives
       </h2>
-      <p className="text-sm text-neutral-400 border-b border-neutral-800 pb-4 mb-4">Narratives represent AI-clustered story themes emerging across travel videos.</p>
-      <div className="relative flex gap-16 text-white">
+      <p className="text-sm text-neutral-400 border-b border-neutral-800 pb-4 mb-4">
+        Narratives represent AI-clustered story themes emerging across travel videos.
+      </p>
 
+      <div className="relative flex gap-16 text-white">
         {/* LEFT SIDE LIST */}
         <div className="flex flex-col gap-4 w-1/2 mt-8">
           {displayedNarratives.map((item) => (
@@ -83,19 +123,26 @@ export default function TrendingNarratives() {
               </h2>
 
               <p className="text-sm mb-6 text-gray-700 px-8 pt-4">
-                {selected.destination}
+                {secondaryLabel(selected)}
               </p>
 
               <div className="grid grid-cols-2 gap-6 text-lg pt-2 px-8 pb-8">
                 <div>
-                  <div className="text-3xl font-bold">{selected.cluster_size}</div>
+                  <div className="text-3xl font-bold">
+                    {selected.cluster_size}
+                  </div>
                   <div className="text-sm">Similar Narratives</div>
                 </div>
 
-
                 <div>
-                  <div className="text-3xl font-bold truncate">{selected.creator_name || selected.source}</div>
-                  <div className="text-sm">Top Creator</div>
+                  <div className="text-3xl font-bold truncate">
+                    {selected.creator_name !== "—"
+                      ? selected.creator_name
+                      : selected.destination}
+                  </div>
+                  <div className="text-sm">
+                    {selected.creator_name !== "—" ? "Top Creator" : "Destination"}
+                  </div>
                 </div>
 
                 <div>
