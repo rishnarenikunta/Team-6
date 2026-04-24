@@ -676,6 +676,17 @@ def get_narratives_enriched() -> list[dict[str, Any]]:
         else:
             sentiment_label = "neutral"
 
+        raw_narrative_risk = doc.get("risk").get("sentiment").lower()
+        # We check in order of severity so the highest risk found wins
+        if "high" in raw_narrative_risk:
+            narrative_risk = "high"
+        elif "medium" in raw_narrative_risk:
+            narrative_risk = "medium"
+        elif "low" in raw_narrative_risk:
+            narrative_risk = "low"
+        else:
+            narrative_risk = "none"
+
         results.append({
             "slug":           narrative_id,          # <── slug as a field
             "narrative_id":   narrative_id,
@@ -683,6 +694,7 @@ def get_narratives_enriched() -> list[dict[str, Any]]:
             "destination":    doc.get("destination", ""),
             "channel_id":     doc.get("channel_id", ""),
             "narrative_text": doc.get("narrative_title", ""),
+            "narrative_risk": narrative_risk,
             "date":           doc["date"].isoformat() if doc.get("date") else None,
             "claims":         claims_by_narrative.get(narrative_id, []),
             "metadata": {
@@ -786,6 +798,17 @@ def get_narratives_enriched_videoDetails() -> list[dict[str, Any]]:
         stats         = meta.get("stats", {})
         raw_sentiment = meta.get("sentiment")
 
+        raw_narrative_risk = doc.get("narrative_risk", "").lower()
+        # We check in order of severity so the highest risk found wins
+        if "high" in raw_narrative_risk:
+            narrative_risk = "high"
+        elif "medium" in raw_narrative_risk:
+            narrative_risk = "medium"
+        elif "low" in raw_narrative_risk:
+            narrative_risk = "low"
+        else:
+            narrative_risk = "none"
+
         results.append({
             "slug":           narrative_id,
             "narrative_id":   narrative_id,
@@ -793,6 +816,7 @@ def get_narratives_enriched_videoDetails() -> list[dict[str, Any]]:
             "destination":    doc.get("destination", ""),
             "channel_id":     doc.get("channel_id", ""),
             "narrative_text": doc.get("narrative_title", ""),
+            "narrative_risk": narrative_risk,
             "creator_pfp":   creator.get("pfp_url", ""),
             "channel_name": creator.get("name", ""),
             "date":           doc["date"].isoformat() if doc.get("date") else None,
@@ -888,6 +912,17 @@ def get_narrative_enriched_videoDetails(narrative_id: str) -> dict[str, Any]:
         if r and r.strip().lower() != "none"
     ]
 
+    raw_narrative_risk = doc.get("narrative_risk", "").lower()
+    # We check in order of severity so the highest risk found wins
+    if "high" in raw_narrative_risk:
+        narrative_risk = "high"
+    elif "medium" in raw_narrative_risk:
+        narrative_risk = "medium"
+    elif "low" in raw_narrative_risk:
+        narrative_risk = "low"
+    else:
+        narrative_risk = "none"
+
     return {
         "slug":           narrative_id,
         "narrative_id":   narrative_id,
@@ -897,6 +932,7 @@ def get_narrative_enriched_videoDetails(narrative_id: str) -> dict[str, Any]:
         "destination":    doc.get("destination", ""),
         "channel_id":     doc.get("channel_id", ""),
         "narrative_text": doc.get("narrative_title", ""),
+        "narrative_risk": narrative_risk,
         "date":           doc["date"].isoformat() if doc.get("date") else None,
         "claims":         claims,
         "metadata": {
