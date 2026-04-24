@@ -11,7 +11,7 @@ type Creator = {
   domain: string
   subscribers: number
   monthlyViews: number
-  contentType: "Travel" | "Food" | "Lifestyle/Vlog" | "Wellness" | "Tech" | "Entertainment" | "News"
+  // contentType: "Travel" | "Food" | "Lifestyle/Vlog" | "Wellness" | "Tech" | "Entertainment" | "News"
   videos: { title: string; views: string; img: string; link: string }[]
   commentVolume30d: number
   sentiment: { positive: number; neutral: number; negative: number }
@@ -47,8 +47,7 @@ type ApiCreatorsResponse = {
 
 // const regions = ["All regions", "Americas", "EMEA", "APAC"] as const
 const subscriberBuckets = ["Any size", "< 250k", "250k - 1M", "> 1M"] as const
-const viewBuckets = ["Any views", "< 5M / mo", "5M - 15M / mo", "> 15M / mo"] as const
-const contentTypes = ["All types", "Travel", "Food", "Lifestyle/Vlog", "Wellness", "Tech", "Entertainment", "News"] as const
+// const contentTypes = ["All types", "Travel", "Food", "Lifestyle/Vlog", "Wellness", "Tech", "Entertainment", "News"] as const
 
 export default function CreatorsPage() {
 
@@ -93,8 +92,7 @@ export default function CreatorsPage() {
   
   // const [region, setRegion] = useState<(typeof regions)[number]>("All regions")
   const [subs, setSubs] = useState<(typeof subscriberBuckets)[number]>("Any size")
-  const [views, setViews] = useState<(typeof viewBuckets)[number]>("Any views")
-  const [type, setType] = useState<(typeof contentTypes)[number]>("All types")
+  // const [type, setType] = useState<(typeof contentTypes)[number]>("All types")
   // const [rankingRegion, setRankingRegion] = useState<Creator["region"]>("Americas")
 
   const filtered = useMemo(() => {
@@ -106,15 +104,10 @@ export default function CreatorsPage() {
         (subs === "< 250k" && creator.subscriber_count < 250000) ||
         (subs === "250k - 1M" && creator.subscriber_count >= 250000 && creator.subscriber_count <= 1000000) ||
         (subs === "> 1M" && creator.subscriber_count > 1000000)
-      const viewsOk =
-        views === "Any views" ||
-        (views === "< 5M / mo" && creator.views < 5000000) ||
-        (views === "5M - 15M / mo" && creator.views >= 5000000 && creator.views <= 15000000) ||
-        (views === "> 15M / mo" && creator.views > 15000000)
 
-      return subsOk && viewsOk
+      return subsOk
     })
-  }, [creators, subs, type, views])
+  }, [creators, subs])
 
   // const regionalRankings = useMemo(() => {
   //   const groups: Record<string, Creator[]> = { Americas: [], EMEA: [], APAC: [] }
@@ -145,8 +138,7 @@ export default function CreatorsPage() {
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 shadow-none">
             {/* <FilterSelect label="Region" value={region} options={regions} onChange={setRegion} /> */}
             <FilterSelect label="Subscribers" value={subs} options={subscriberBuckets} onChange={setSubs} />
-            <FilterSelect label="Monthly views" value={views} options={viewBuckets} onChange={setViews} />
-            <FilterSelect label="Content type" value={type} options={contentTypes} onChange={setType} />
+            {/* <FilterSelect label="Content type" value={type} options={contentTypes} onChange={setType} /> */}
           </div>
           <p className="mt-4 text-xs text-gray-400">
             Showing {filtered.length} of {creators.length} creators · Filters update instantly.

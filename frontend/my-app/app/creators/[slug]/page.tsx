@@ -99,11 +99,13 @@ export default function CreatorDetailPage() {
         const data: ApiContentCreatorResponse = await res.json()
         if (!cancelled) setCreator(data)
         console.log("Fetched creator data:", data)
-        const pfpRes = await fetch(`/api/${data.channel_id}/pfp`, { cache: "no-store" })
+        const pfpRes = await fetch(`/api/creators/${data.channel_id}/pfp`, { cache: "no-store" })
         if (pfpRes.ok) {
           const pfpData = await pfpRes.json()
+          console.log("pfp url of", data.channel_id, "is", pfpRes.ok ? pfpData.pfp_url : "not found")
           if (!cancelled) setPfp(pfpData.pfp_url)
         }
+        
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : "Failed to fetch creator"
         if (!cancelled) setError(message)
@@ -132,7 +134,7 @@ export default function CreatorDetailPage() {
     )
   }
 
-  const avatar = pfp || (creator.videos.length > 0 ? `https://i.ytimg.com/vi/${creator.videos[0].video_id}/hqdefault.jpg` : null)
+  const avatar = pfp
   const recentVideoViews = creator.videos.reduce((sum, video) => sum + (Number.isFinite(video.view_count) ? video.view_count : 0), 0)
   const recentVideoLikes = creator.videos.reduce((sum, video) => sum + (Number.isFinite(video.like_count) ? video.like_count : 0), 0)
   const recentVideoComments = creator.videos.reduce((sum, video) => sum + (Number.isFinite(video.comment_count) ? video.comment_count : 0), 0)

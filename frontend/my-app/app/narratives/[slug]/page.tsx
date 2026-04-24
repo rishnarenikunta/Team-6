@@ -5,6 +5,14 @@ const API_BASE = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+type Claim = {
+  claim_text: string
+  claim_risk: string
+  claim_risk_extra_info?: string | null
+  source: string
+  date: string
+}
+
 type ApiNarrativesResponse = {
   slug: string
   narrative_id: string
@@ -13,12 +21,7 @@ type ApiNarrativesResponse = {
   channel_id: string
   narrative_text: string
   date: string
-  claims: {
-    claim_text: string
-    claim_risk: "Low" | "Medium" | "High"
-    source: string
-    date: string
-  }[]
+  claims: Claim[]
   metadata: {
     tags: string[]
     sentiment_score: number | null
@@ -46,6 +49,31 @@ const sentimentChip = (sentiment: "positive" | "neutral" | "negative" | null) =>
   return "text-amber-200 bg-amber-400/10"
 }
 
+function claimRiskClassification(claim: Claim): Claim {
+  const riskText = (claim.claim_risk ?? "").toLowerCase().trim()
+  const risk =
+    riskText.includes("low")
+      ? "low"
+      : riskText.includes("high")
+      ? "high"
+      : riskText.includes("none") || riskText.includes("unknown")
+      ? "none"
+      : "medium"
+
+  const extraInfo = riskText
+    .replace("unknown", "")
+    .replace(risk, "")
+    .replace(/\brisk\b/g, "")
+    .replace(/^[\s;:,-]+|[\s;:,-]+$/g, "")
+    .trim() || null
+
+  return {
+    ...claim,
+    claim_risk: risk,
+    claim_risk_extra_info: extraInfo,
+  }
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default async function NarrativeDetailPage({ params }: Params) {
@@ -62,6 +90,7 @@ export default async function NarrativeDetailPage({ params }: Params) {
   }
 
   const narrative: ApiNarrativesResponse = await res.json();
+  narrative.claims = (narrative.claims ?? []).map(claimRiskClassification)
 
   // Build creator map
   const creatorMap: Record<string, string> = {};
@@ -245,37 +274,47 @@ export default async function NarrativeDetailPage({ params }: Params) {
             <span className="text-xs text-gray-400">{narrative?.claims?.length ?? 0} shown</span>
           </div>
           <div className="flex gap-4 overflow-x-auto pb-2">
-            {narrative.claims.map((claim, idx) => (
-              <div
-                key={idx}
-                className="min-w-[240px] max-w-[260px] rounded-2xl border border-white/10 bg-gradient-to-b from-[#151525] via-[#11111a] to-[#0c0c12] p-4 shadow-lg shadow-black/40"
-              >
-                <span
-                  className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] uppercase tracking-wide ${
-                    claim.claim_risk === "High"
-                      ? "border-rose-300/40 text-rose-200 bg-rose-400/10"
-                      : claim.claim_risk === "Low"
-                      ? "border-emerald-400/40 text-emerald-200 bg-emerald-400/10"
-                      : "border-amber-300/40 text-amber-200 bg-amber-300/10"
-                  }`}
+            {narrative.claims.map((claim, idx) => {
+              const risk = claim.claim_risk.toLowerCase()
+              const riskLabel = risk === "none" ? "no risk" : `${risk} risk`
+
+              return (
+                <div
+                  key={idx}
+                  className="min-w-[240px] max-w-[260px] rounded-2xl border border-white/10 bg-gradient-to-b from-[#151525] via-[#11111a] to-[#0c0c12] p-4 shadow-lg shadow-black/40"
                 >
-                  {claim.claim_risk} risk
-                </span>
-                <p className="mt-3 text-sm text-gray-200 mb-3">&quot;{claim.claim_text}&quot;</p>
-                <div className="text-xs text-gray-400 space-y-1">
-                  <p>
-                    <span className="text-gray-500">Source:</span>{" "}
-                    <Link href={`/creators/${claim.source}`} className="hover:underline hover:underline-offset-4">
-                      {creatorMap[claim.source] || claim.source}
-                    </Link>
-                  </p>
-                  <p>
-                    <span className="text-gray-500">Date:</span>{" "}
-                    {claim.date ? new Date(claim.date).toLocaleDateString() : "—"}
-                  </p>
+                  <span
+                    className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] uppercase tracking-wide ${
+                      risk === "high"
+                        ? "border-rose-300/40 text-rose-200 bg-rose-400/10"
+                        : risk === "low"
+                        ? "border-emerald-400/40 text-emerald-200 bg-emerald-400/10"
+                        : risk === "none"
+                        ? "border-slate-300/40 text-slate-200 bg-slate-300/10"
+                        : "border-amber-300/40 text-amber-200 bg-amber-300/10"
+                    }`}
+                  >
+                    {riskLabel}
+                  </span>
+                  {claim.claim_risk_extra_info ? (
+                    <p className="mt-2 text-xs text-gray-400">{claim.claim_risk_extra_info}</p>
+                  ) : null}
+                  <p className="mt-3 text-sm text-gray-200 mb-3">&quot;{claim.claim_text}&quot;</p>
+                  <div className="text-xs text-gray-400 space-y-1">
+                    <p>
+                      <span className="text-gray-500">Source:</span>{" "}
+                      <Link href={`/creators/${claim.source}`} className="hover:underline hover:underline-offset-4">
+                        {creatorMap[claim.source] || claim.source}
+                      </Link>
+                    </p>
+                    <p>
+                      <span className="text-gray-500">Date:</span>{" "}
+                      {claim.date ? new Date(claim.date).toLocaleDateString() : "—"}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </section>
 
