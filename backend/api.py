@@ -1092,8 +1092,8 @@ def get_trending_locations() -> list[dict[str, Any]]:
             {
                 "$group": {
                     "_id": {
-                        "year":  {"$year": "$date"},
-                        "month": {"$month": "$date"},
+                        "year":  {"$year": {"$dateFromString": {"dateString": "$upload_date"}}},
+                        "month": {"$month": {"$dateFromString": {"dateString": "$upload_date"}}},
                     },
                     "mentions": {"$sum": 1},
                 }
