@@ -30,7 +30,7 @@ interface Location {
 function buildChartData(locations: Location[]) {
   const periodSet = new Set<string>();
   locations.forEach((loc) => (loc.timeline ?? []).forEach((t) => periodSet.add(t.period)));
-  const periods = Array.from(periodSet).sort();
+  const periods = Array.from(periodSet).sort().slice(-10);
 
   return periods.map((period) => {
     const row: Record<string, string | number> = { period };
