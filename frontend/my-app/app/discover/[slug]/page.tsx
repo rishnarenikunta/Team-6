@@ -9,6 +9,7 @@ interface Claim {
   source: string
   source_id?: string
   claim_risk: string
+  claim_risk_extra_info?: string | null
   date: string | null
 }
 
@@ -70,6 +71,31 @@ interface Destination {
   claims: Claim[]
 }
 
+function claimRiskClassification(claim: Claim): Claim {
+  const riskText = (claim.claim_risk ?? "").toLowerCase().trim()
+  const risk =
+    riskText.includes("low")
+      ? "low"
+      : riskText.includes("high")
+      ? "high"
+      : riskText.includes("none") || riskText.includes("unknown")
+      ? "none"
+      : "medium"
+
+  const extraInfo = riskText
+    .replace("unknown", "")
+    .replace(risk, "")
+    .replace(/\brisk\b/g, "")
+    .replace(/^[\s;:,-]+|[\s;:,-]+$/g, "")
+    .trim() || null
+
+  return {
+    ...claim,
+    claim_risk: risk,
+    claim_risk_extra_info: extraInfo,
+  }
+}
+
 export default function DestinationPage() {
   const { slug } = useParams() as { slug: string }
   const [destination, setDestination] = useState<Destination | null>(null)
@@ -94,6 +120,7 @@ export default function DestinationPage() {
       if (res.status === 404) { setNotFound(true); return }
       if (!res.ok) throw new Error(`API ${res.status}`)
       const data: Destination = await res.json()
+      data.claims = (data.claims ?? []).map(claimRiskClassification)
 
       if (overviewRes.ok) {
         const overview: DestinationOverview = await overviewRes.json()
@@ -161,11 +188,12 @@ export default function DestinationPage() {
     )
   }
 
-  const riskCounts = { low: 0, medium: 0, high: 0 }
+  const riskCounts = { low: 0, medium: 0, high: 0, none: 0 }
   destination.claims.forEach(c => {
     const r = (c.claim_risk ?? "").toLowerCase()
-    if (r.includes("low")) riskCounts.low++
-    else if (r.includes("high")) riskCounts.high++
+    if (r === "low") riskCounts.low++
+    else if (r === "high") riskCounts.high++
+    else if (r === "none") riskCounts.none++
     else riskCounts.medium++
   })
 
@@ -214,13 +242,14 @@ export default function DestinationPage() {
         </header>
 
         {/* Metrics */}
-        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
+        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-7">
           <Metric label="Claims analyzed" value={(overviewTotals?.total_claims ?? destination.claims.length).toString()} />
           <Metric label="Narratives" value={(overviewTotals?.total_narratives ?? 0).toString()} />
           <Metric label="Videos analyzed" value={(videoAnalyzed ?? 0).toString()} />
           <Metric label="Low risk claims" value={riskCounts.low.toString()} />
           <Metric label="Medium risk claims" value={riskCounts.medium.toString()} />
           <Metric label="High risk claims" value={riskCounts.high.toString()} />
+          <Metric label="No risk claims" value={riskCounts.none.toString()} />
         </section>
 
         {/* Top claim */}
@@ -252,8 +281,9 @@ export default function DestinationPage() {
             <div className="flex gap-4 overflow-x-auto pb-2">
               {destination.claims.map((claim, i) => {
                 const risk = (claim.claim_risk ?? "").toLowerCase()
-                const isHigh = risk.includes("high")
-                const isLow = risk.includes("low")
+                const isHigh = risk === "high"
+                const isLow = risk === "low"
+                const isNone = risk === "none"
                 return (
                   <div
                     key={i}
@@ -264,10 +294,15 @@ export default function DestinationPage() {
                         ? "border-rose-300/40 text-rose-200 bg-rose-400/10"
                         : isLow
                         ? "border-emerald-400/40 text-emerald-200 bg-emerald-400/10"
+                        : isNone
+                        ? "border-slate-300/40 text-slate-200 bg-slate-300/10"
                         : "border-amber-300/40 text-amber-200 bg-amber-300/10"
                     }`}>
-                      {claim.claim_risk || "unknown risk"}
+                      Risk: {claim.claim_risk || "unknown risk"}
                     </span>
+                    {claim.claim_risk_extra_info ? (
+                      <p className="text-xs text-gray-400">risk details: {claim.claim_risk_extra_info}</p>
+                    ) : null}
                     <p className="text-sm text-gray-100 leading-snug">&quot;{claim.claim_title}&quot;</p>
                     <p className="text-xs text-gray-500 mt-auto">
                       {claim.source_id ? (

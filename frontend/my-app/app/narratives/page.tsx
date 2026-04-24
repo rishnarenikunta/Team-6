@@ -176,13 +176,6 @@ useEffect(() => {
                   setPage(0);
                 }}
               />
-              <button
-                type="button"
-                className="rounded-xl bg-white/10 px-4 py-2 text-sm font-medium transition hover:bg-white/20"
-                onClick={() => setPage(0)}
-              >
-                Analyze
-              </button>
             </div>
           </form>
         </header>
@@ -245,7 +238,7 @@ useEffect(() => {
                   </div>
 
                   <div className="mt-4 flex flex-wrap gap-2 text-[11px] uppercase tracking-wide text-gray-300">
-                    {narrative.tags.map((tag) => (
+                    {narrative.tags.slice(0, 5).map((tag) => (
                       <span key={tag} className="rounded-full bg-white/5 px-3 py-1">
                         {tag}
                       </span>
