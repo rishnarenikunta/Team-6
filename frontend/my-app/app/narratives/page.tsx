@@ -11,7 +11,7 @@ type Narrative = {
   creators: string
   date: string
   claim: string
-  risk: string
+  risk: "low" | "medium" | "high" | "none";
   tags: string[]
   destination?: string
 }
@@ -27,7 +27,7 @@ const fallbackNarratives: Narrative[] = [
     creators: "N/A",
     date: "—",
     claim: "No narratives could be loaded from the API.",
-    risk: "—",
+    risk: "none",
     tags: [],
     destination: "—",
   },
@@ -48,6 +48,7 @@ export default function NarrativePage() {
     destination: string;
     channel_id: string;
     narrative_text: string;
+    narrative_risk: "low" | "medium" | "high" | "none";
     date: string;
     claims: { claim_text?: string; claim_risk?: string }[];
     metadata: {
@@ -109,7 +110,7 @@ useEffect(() => {
         claim: item.claims.length > 0
           ? (item.claims[0].claim_text || "No claim text")
           : "No claims identified",
-        risk: "—",
+        risk: item.narrative_risk,
         tags: item.metadata.tags || [],
         destination: item.destination || "Unknown destination",
       }));
