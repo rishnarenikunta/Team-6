@@ -178,6 +178,8 @@ export default async function NarrativeDetailPage({ params }: Params) {
                 {narrative.metadata.webpage_url ? (
                   <Link
                     href={narrative.metadata.webpage_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="text-sm text-gray-100 hover:underline hover:underline-offset-4"
                   >
                     {narrative.metadata.title}
@@ -213,6 +215,8 @@ export default async function NarrativeDetailPage({ params }: Params) {
               {narrative.metadata?.webpage_url ? (
                 <Link
                   href={narrative.metadata.webpage_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="inline-flex items-center justify-center rounded-xl bg-[#E4CAFF] px-4 py-2 text-sm font-medium text-black hover:bg-white transition"
                 >
                   Watch on YouTube

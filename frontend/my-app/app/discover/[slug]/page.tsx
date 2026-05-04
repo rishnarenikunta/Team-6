@@ -350,6 +350,8 @@ export default function DestinationPage() {
                       {narr.video?.webpage_url ? (
                         <Link
                           href={narr.video.webpage_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
                           className="rounded-full bg-white/5 px-2.5 py-1 underline underline-offset-4 decoration-white/20 hover:text-white"
                         >
                           Source video

@@ -185,7 +185,11 @@ export default function CreatorsPage() {
                         className="grid grid-cols-[1fr_auto] gap-2 items-center rounded-xl border border-white/5 bg-white/5 px-3 py-2 hover:border-white/15 transition"
                       >
                         <div className="space-y-1">
-                          <Link href={video.webpage_url}>
+                          <Link
+                            href={video.webpage_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
                             <span className="line-clamp-2 font-medium hover:text-white">{video.title}</span>
                           </Link>
                           <div className="flex flex-wrap gap-2 text-[11px] text-gray-400">

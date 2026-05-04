@@ -223,7 +223,11 @@ export default function CreatorDetailPage() {
             {topVideo ? (
               <p className="text-sm text-gray-300">
                 Top recent video:{" "}
-                <Link href={topVideo.webpage_url} className="underline underline-offset-4 decoration-white/30 hover:text-white">
+                <Link 
+                  href={topVideo.webpage_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline underline-offset-4 decoration-white/30 hover:text-white">
                   {topVideo.title}
                 </Link>{" "}
                 · {formatNumber(topVideo.view_count)} views
@@ -380,6 +384,8 @@ export default function CreatorDetailPage() {
                 <Link
                   key={video.video_id}
                   href={video.webpage_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="group rounded-2xl border border-white/10 bg-gradient-to-b from-[#151525] via-[#11111a] to-[#0c0c12] shadow-lg shadow-black/40 overflow-hidden transition hover:-translate-y-1 hover:border-white/20"
                 >
                   <div className="h-40 w-full bg-gray-800 overflow-hidden">
